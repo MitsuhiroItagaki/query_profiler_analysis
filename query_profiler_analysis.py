@@ -12453,13 +12453,13 @@ def comprehensive_performance_judgment(original_metrics, optimized_metrics):
         photon_full_support_original = orig_support
         photon_full_support_optimized = opt_support
         if opt_support and not orig_support:
-            photon_adjustment_factor = 0.97
-            photon_bonus_text = t("✅ Photon FULLサポート(最適化)優遇適用 (-3%)",
-                                  "✅ Photon FULL support advantage for optimized (-3%)")
+            photon_adjustment_factor = 0.90
+            photon_bonus_text = t("✅ Photon FULLサポート(最適化)優遇適用 (-10%)",
+                                  "✅ Photon FULL support advantage for optimized (-10%)")
         elif orig_support and not opt_support:
-            photon_adjustment_factor = 1.03
-            photon_bonus_text = t("⚠️ Photon FULLサポート(元)のみ → 最適化へペナルティ (+3%)",
-                                  "⚠️ Photon FULL support on original only; penalty for optimized (+3%)")
+            photon_adjustment_factor = 1.10
+            photon_bonus_text = t("⚠️ Photon FULLサポート(元)のみ → 最適化へペナルティ (+10%)",
+                                  "⚠️ Photon FULL support on original only; penalty for optimized (+10%)")
         else:
             photon_bonus_text = t("➖ Photon FULLサポート調整なし",
                                   "➖ No Photon FULL support adjustment")
