@@ -14,18 +14,12 @@ A single-file tool to analyze Databricks SQL Profiler JSON logs, identify bottle
 - **Safe debug mode**: Keep or clean up intermediate artifacts
 
 ## Requirements
-- Python 3.9+ (tested locally without Spark; Databricks Runtime when running as a notebook)
+- Databricks Runtime (run as a notebook)
 - Optional: `requests` for some HTTP interactions
-
-Install optional dependency locally:
-
-```bash
-pip install requests
-```
 
 ## Quick start
 
-### Option A: Run on Databricks (recommended)
+### Run on Databricks
 1. Import or create a notebook from `query_profiler_analysis.py`.
 2. Open the configuration cell near the top of the file and set key variables:
 

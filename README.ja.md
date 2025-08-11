@@ -14,18 +14,12 @@ Databricks SQL Profiler の JSON ログを解析し、ボトルネックを特�
 - **安全なデバッグモード**: 中間成果物の保持/削除を制御
 
 ## 必要要件
-- Python 3.9+（ローカル実行時）。Databricks ではノートブックとして実行
+- Databricks Runtime（ノートブックとして実行）
 - 任意: 一部の HTTP 通信で `requests` を利用
-
-ローカルでの任意依存関係のインストール:
-
-```bash
-pip install requests
-```
 
 ## クイックスタート
 
-### 方法 A: Databricks 上で実行（推奨）
+### Databricks 上で実行
 1. `query_profiler_analysis.py` からノートブックを作成またはインポートします。
 2. 冒頭の設定セルで主要変数を設定します:
 
