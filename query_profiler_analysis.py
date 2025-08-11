@@ -324,25 +324,182 @@ def extract_optimization_points_from_query(query: str, trial_type: str, attempt_
     
     return f"Trial {attempt_num} ({trial_type}): {'; '.join(optimization_points)}"
 
-def save_optimization_points_summary(optimization_point: str) -> None:
+def save_optimization_points_summary(
+    optimization_point: str,
+    *,
+    query_id: Optional[str] = None,
+    trial_type: Optional[str] = None,
+    attempt_num: Optional[int] = None,
+    metrics: Optional[Dict[str, Any]] = None,
+    bottleneck_indicators: Optional[Dict[str, Any]] = None,
+    detailed_bottleneck: Optional[Dict[str, Any]] = None,
+    expected_improvements: Optional[List[str]] = None,
+    overall_improvement: Optional[Dict[str, Any]] = None,
+) -> None:
     """
-    最適化ポイントを要約ファイルに追記
+    最適化ポイントを「読みやすい複数行ブロック」として要約ファイルに追記する
+    
+    - 旧シグネチャ互換: 第一引数のみで呼ばれても動作（最低限のDetected行のみ）
+    - 追加情報（Key Plan / Recs / Bottleneck / Metrics / Anticipated）は存在するものだけを出力
+    - ブロック間は '---' 区切り
     
     Args:
-        optimization_point: 抽出された最適化ポイント
+        optimization_point: 抽出された最適化ポイント（軽量カテゴリ検出の要約文字列）
+        query_id: クエリID
+        trial_type: 試行タイプ（"initial"/"performance_improvement"/"error_correction"/等）
+        attempt_num: 試行番号
+        metrics: 抽出済みメトリクス（overall_metrics等を含む）
+        bottleneck_indicators: ボトルネック指標（metricsからの派生）
+        detailed_bottleneck: 詳細ボトルネック分析（shuffle_optimization_hints等）
+        expected_improvements: 期待改善リスト（文字列のリスト）
+        overall_improvement: 総合改善の辞書（例: {"from_ms": int, "to_ms": int, "ratio": float}）
     """
     try:
         from datetime import datetime
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         summary_filename = "optimization_points_summary.txt"
         
+        lines: List[str] = []
+        header_parts: List[str] = [f"[{timestamp}]"]
+        if attempt_num is not None and trial_type:
+            header_parts.append(f"Trial {attempt_num} ({trial_type})")
+        elif attempt_num is not None:
+            header_parts.append(f"Trial {attempt_num}")
+        elif trial_type:
+            header_parts.append(f"({trial_type})")
+        if query_id:
+            header_parts.append(f"QueryID: {query_id}")
+        header = " ".join(header_parts)
+        lines.append(header)
+        
+        # Detected line: 既存の軽量カテゴリ出力をそのまま活用
+        if optimization_point:
+            # 旧形式: "Trial X (type): a; b; c" の右側のみ抽出
+            detected = optimization_point
+            if ":" in optimization_point:
+                detected = optimization_point.split(":", 1)[1].strip()
+            lines.append(f"- Detected: {detected}")
+        
+        # Key Plan: shuffle_optimization_hints の先頭1件を圧縮表示
+        hints = []
+        if detailed_bottleneck and isinstance(detailed_bottleneck, dict):
+            hints = detailed_bottleneck.get("shuffle_optimization_hints", []) or []
+        if hints:
+            first = hints[0]
+            suggested_sql = first.get("suggested_sql")
+            priority = first.get("priority")
+            reason = first.get("reason")
+            if suggested_sql:
+                key_plan_line = f"- Key Plan: {suggested_sql}"
+                if priority:
+                    key_plan_line += f" [{priority}]"
+                if reason:
+                    key_plan_line += f" Reason: {reason}"
+                lines.append(key_plan_line)
+        
+        # Recs: performance_recommendations を重要度順で1〜2件
+        recs = []
+        if detailed_bottleneck and isinstance(detailed_bottleneck, dict):
+            recs = detailed_bottleneck.get("performance_recommendations", []) or []
+        if recs:
+            def rec_priority_key(r: Dict[str, Any]) -> int:
+                p = (r.get("priority") or "").upper()
+                return {"CRITICAL": 0, "HIGH": 1}.get(p, 2)
+            recs_sorted = sorted(recs, key=rec_priority_key)
+            top_recs = recs_sorted[:2]
+            rec_items = []
+            for r in top_recs:
+                p = r.get("priority", "").upper() or "INFO"
+                t = r.get("type", "unknown")
+                d = r.get("description", "")
+                rec_items.append(f"{p} {t} ({d})")
+            if rec_items:
+                lines.append(f"- Recs: { '; '.join(rec_items) }")
+        
+        # Bottleneck: spill合計やskew総数、TopNodes上位2件
+        spill_summary = None
+        skew_summary = None
+        top_nodes_summary = None
+        if detailed_bottleneck and isinstance(detailed_bottleneck, dict):
+            spill = detailed_bottleneck.get("spill_analysis", {}) or {}
+            if spill.get("total_spill_gb", 0) > 0:
+                total_spill_gb = spill.get("total_spill_gb", 0.0)
+                spill_nodes = spill.get("spill_nodes", []) or []
+                spill_summary = f"Spill {total_spill_gb:.1f}GB on {len(spill_nodes)} nodes"
+            skew = detailed_bottleneck.get("skew_analysis", {}) or {}
+            if skew.get("total_skewed_partitions", 0) > 0:
+                total_skew = skew.get("total_skewed_partitions", 0)
+                skew_nodes = skew.get("skewed_nodes", []) or []
+                skew_summary = f"Skew {total_skew} parts on {len(skew_nodes)} nodes"
+            top_nodes = detailed_bottleneck.get("top_bottleneck_nodes", []) or []
+            if top_nodes:
+                items = []
+                for node in top_nodes[:2]:
+                    name = node.get("node_name", "node")
+                    dur_ms = node.get("duration_ms", 0)
+                    sev = (node.get("severity") or "").upper()
+                    sev_short = "CRIT" if sev == "CRITICAL" else "HIGH" if sev == "HIGH" else "MED" if sev == "MEDIUM" else "LOW"
+                    items.append(f"{name} {dur_ms/1000:.1f}s({sev_short})")
+                if items:
+                    top_nodes_summary = f"TopNodes: {', '.join(items)}"
+        bn_items = [x for x in [spill_summary, skew_summary, top_nodes_summary] if x]
+        if bn_items:
+            lines.append(f"- Bottleneck: {'; '.join(bn_items)}")
+        
+        # Metrics: 実効値をコンパクトに
+        overall = (metrics or {}).get("overall_metrics") if isinstance(metrics, dict) else None
+        if overall is None and isinstance(metrics, dict):
+            overall = metrics.get("overall_metrics")
+        if overall is None and isinstance(metrics, dict):
+            overall = metrics
+        if isinstance(overall, dict):
+            total_time_ms = overall.get('total_time_ms') or overall.get('task_total_time_ms') or overall.get('execution_time_ms')
+            read_bytes = overall.get('read_bytes')
+            rows_read = overall.get('rows_read_count') or overall.get('rows_produced_count')
+            photon_enabled = overall.get('photon_enabled')
+            cache_hit_ratio = None
+            if isinstance(bottleneck_indicators, dict):
+                cache_hit_ratio = bottleneck_indicators.get('cache_hit_ratio')
+            selectivity = None
+            if isinstance(bottleneck_indicators, dict):
+                selectivity = bottleneck_indicators.get('data_selectivity')
+            parts: List[str] = []
+            if isinstance(total_time_ms, (int, float)) and total_time_ms > 0:
+                parts.append(f"Exec {int(total_time_ms):,}ms")
+            if isinstance(read_bytes, (int, float)) and read_bytes > 0:
+                parts.append(f"Read {read_bytes/1024/1024/1024:.1f}GB")
+            if isinstance(rows_read, (int, float)) and rows_read > 0:
+                parts.append(f"Rows {int(rows_read):,}")
+            if isinstance(cache_hit_ratio, (int, float)):
+                parts.append(f"CacheHit {cache_hit_ratio:.2f}")
+            if isinstance(photon_enabled, bool):
+                parts.append("Photon ON" if photon_enabled else "Photon OFF")
+            if isinstance(selectivity, (int, float)):
+                parts.append(f"Selectivity {selectivity:.2f}")
+            if parts:
+                lines.append(f"- Metrics: {'; '.join(parts)}")
+        
+        # Anticipated: expected_improvements と overall_improvement
+        ant_parts: List[str] = []
+        if isinstance(expected_improvements, list) and expected_improvements:
+            ant_parts.extend([s.replace("**", "").strip() for s in expected_improvements[:2]])
+        if isinstance(overall_improvement, dict):
+            from_ms = overall_improvement.get("from_ms")
+            to_ms = overall_improvement.get("to_ms")
+            ratio = overall_improvement.get("ratio")
+            if isinstance(from_ms, (int, float)) and isinstance(to_ms, (int, float)) and isinstance(ratio, (int, float)):
+                ant_parts.append(f"Overall: {int(from_ms):,}ms → {int(to_ms):,}ms (≈{int(ratio*100)}%)")
+        if ant_parts:
+            lines.append(f"- Anticipated: {' | '.join(ant_parts)}")
+        
+        lines.append("---")
+        block = "\n".join(lines) + "\n"
+        
         with open(summary_filename, 'a', encoding='utf-8') as f:
-            f.write(f"[{timestamp}] {optimization_point}\n")
-        
-        print(f"📝 Optimization points saved: {optimization_point}")
-        
+            f.write(block)
+        print("📝 Optimization points block saved")
     except Exception as e:
-        print(f"⚠️ Failed to save optimization points: {str(e)}")
+        print(f"⚠️ Failed to save optimization points block: {str(e)}")
 
 def save_trial_log(optimization_point: str) -> None:
     """
@@ -396,19 +553,27 @@ def load_optimization_points_summary() -> str:
         if not content:
             return ""
         
-        # 最新の5つのポイントに制限（レポートサイズを抑制）
+        # 新形式（--- 区切りブロック）対応
+        blocks = [b.strip() for b in content.split('\n---') if b.strip()]
+        if len(blocks) > 1 or (len(blocks) == 1 and '\n' in blocks[0] and blocks[0].startswith('[')):
+            # ブロック形式とみなして最新5ブロック
+            recent_blocks = blocks[-5:] if len(blocks) > 5 else blocks
+            summary = "## 🎯 Query Optimization Points Summary\n\n"
+            summary += "Recent successful optimization techniques applied:\n\n"
+            # ブロックをそのまま貼り付け
+            for b in recent_blocks:
+                summary += b + "\n\n"
+            return summary
+        
+        # 旧形式（1行ごと）フォールバック
         lines = content.split('\n')
         recent_points = lines[-5:] if len(lines) > 5 else lines
-        
         summary = "## 🎯 Query Optimization Points Summary\n\n"
         summary += "Recent successful optimization techniques applied:\n\n"
-        
         for line in recent_points:
             if line.strip():
-                # タイムスタンプを除去してポイントのみを抽出
                 point_content = line.split('] ', 1)[-1] if '] ' in line else line
                 summary += f"- {point_content}\n"
-        
         summary += "\n"
         return summary
         
@@ -13819,7 +13984,14 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                             try:
                                 optimization_point = extract_optimization_points_from_query(current_query, "error_correction", attempt_num)
                                 save_trial_log(optimization_point)  # Log individual trial
-                                save_optimization_points_summary(optimization_point)  # Keep existing functionality
+                                save_optimization_points_summary(
+                                    optimization_point,
+                                    trial_type="error_correction",
+                                    attempt_num=attempt_num,
+                                    metrics=metrics,
+                                    bottleneck_indicators=metrics.get('bottleneck_indicators') if isinstance(metrics, dict) else None,
+                                    detailed_bottleneck=extract_detailed_bottleneck_analysis(metrics) if isinstance(metrics, dict) else None
+                                )
                             except Exception as e:
                                 print(f"⚠️ Optimization points extraction failed: {str(e)}")
                         else:
@@ -15383,7 +15555,14 @@ elif original_query_for_explain and original_query_for_explain.strip():
                     if query_for_extraction:
                         optimization_point = extract_optimization_points_from_query(query_for_extraction, "single_optimization", 1)
                         save_trial_log(optimization_point)  # Log individual trial
-                        save_optimization_points_summary(optimization_point)  # Keep existing functionality
+                        save_optimization_points_summary(
+                            optimization_point,
+                            trial_type="single_optimization",
+                            attempt_num=1,
+                            metrics=current_metrics,
+                            bottleneck_indicators=current_metrics.get('bottleneck_indicators') if isinstance(current_metrics, dict) else None,
+                            detailed_bottleneck=extract_detailed_bottleneck_analysis(current_metrics) if isinstance(current_metrics, dict) else None
+                        )
                 except Exception as e:
                     print(f"⚠️ Optimization points extraction failed: {str(e)}")
                 
