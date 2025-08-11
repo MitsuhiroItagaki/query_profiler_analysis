@@ -1,6 +1,6 @@
 # Databricks SQL Profiler Analysis Tool
 
-A single-file tool to analyze Databricks SQL Profiler JSON logs, identify bottlenecks, and propose concrete optimization steps. It can optionally refine the generated report using an LLM (Databricks Model Serving, OpenAI, Azure OpenAI, or Anthropic).
+A single-file tool to analyze Databricks SQL Profiler JSON logs with an LLM (Databricks Model Serving, OpenAI, Azure OpenAI, or Anthropic), identify bottlenecks, and propose concrete optimization steps.
 
 - **Main script**: `query_profiler_analysis.py`
 - **Outputs**: optimization reports and SQL files (see Outputs below)

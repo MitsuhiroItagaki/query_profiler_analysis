@@ -1,6 +1,6 @@
 # Databricks SQL プロファイラー分析ツール
 
-Databricks SQL Profiler の JSON ログを解析し、ボトルネックを特定して具体的な最適化手順を提案する単一ファイルのツールです。必要に応じて、LLM（Databricks Model Serving / OpenAI / Azure OpenAI / Anthropic）でレポートを推敲できます。
+Databricks SQL Profiler の JSON ログをLLM（Databricks Model Serving / OpenAI / Azure OpenAI / Anthropic）で解析し、ボトルネックを特定して具体的な最適化手順を提案する単一ファイルのツールです。
 
 - **メインスクリプト**: `query_profiler_analysis.py`
 - **出力**: 最適化レポートと SQL ファイル（下記参照）
