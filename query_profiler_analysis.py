@@ -227,7 +227,7 @@ ENHANCED_ERROR_HANDLING = 'Y'
 # 🔍 SAVE_INTERMEDIATE_RESULTS: Save intermediate analysis results for debugging
 # - 'Y': Save JSON files with intermediate analysis data at each stage
 # - 'N': No intermediate result saving (reduces file output)
-SAVE_INTERMEDIATE_RESULTS = 'Y'
+SAVE_INTERMEDIATE_RESULTS = 'N'
 
 # 🎯 STAGED_JUDGMENT_MODE: 段階的パフォーマンス判定（フォールバック含む）
 # - 'Y': 3段階の段階的分析＋フォールバックを有効化
