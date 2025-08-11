@@ -16128,8 +16128,11 @@ try:
     _debug_enabled_final = globals().get('DEBUG_ENABLED', 'N')
     if str(_debug_enabled_final).upper() != 'Y':
         import os
-        _additional_text_files = ["optimization_points_summary.txt", "trial_logs.txt"]
+        import glob
         _deleted_count = 0
+
+        # Delete fixed auxiliary files
+        _additional_text_files = ["optimization_points_summary.txt", "trial_logs.txt"]
         for _file_path in _additional_text_files:
             try:
                 if os.path.exists(_file_path):
@@ -16138,6 +16141,19 @@ try:
                     _deleted_count += 1
             except Exception as _e:
                 print(f"❌ Deletion failed: {_file_path} - {str(_e)}")
+
+        # Delete performance judgment logs created with timestamped names
+        _additional_glob_patterns = ["output_performance_judgment_log_*.txt"]
+        for _pattern in _additional_glob_patterns:
+            for _file_path in glob.glob(_pattern):
+                try:
+                    if os.path.exists(_file_path):
+                        os.remove(_file_path)
+                        print(f"✅ Deletion completed: {_file_path}")
+                        _deleted_count += 1
+                except Exception as _e:
+                    print(f"❌ Deletion failed: {_file_path} - {str(_e)}")
+
         if _deleted_count == 0:
             print("📁 No additional intermediate text files found for deletion")
 except Exception as _e:
