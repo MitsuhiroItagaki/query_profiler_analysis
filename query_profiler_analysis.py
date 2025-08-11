@@ -12441,13 +12441,57 @@ def comprehensive_performance_judgment(original_metrics, optimized_metrics):
     print(t(f"   最終改善率         : {improvement_pct:+.2f}%",
              f"   Final Improvement Rate  : {improvement_pct:+.2f}%"))
     
+    # === Photon FULL support adjustment (EXPLAIN-based) ===
+    photon_adjustment_factor = 1.0
+    photon_full_support_original = None
+    photon_full_support_optimized = None
+    try:
+        orig_text = globals().get('cached_original_explain_cost_content', '') or ''
+        opt_text = globals().get('cached_optimized_explain_cost_content', '') or ''
+        orig_support = parse_photon_explanation(orig_text).get('supported', False) if orig_text else False
+        opt_support = parse_photon_explanation(opt_text).get('supported', False) if opt_text else False
+        photon_full_support_original = orig_support
+        photon_full_support_optimized = opt_support
+        if opt_support and not orig_support:
+            photon_adjustment_factor = 0.97
+            photon_bonus_text = t("✅ Photon FULLサポート(最適化)優遇適用 (-3%)",
+                                  "✅ Photon FULL support advantage for optimized (-3%)")
+        elif orig_support and not opt_support:
+            photon_adjustment_factor = 1.03
+            photon_bonus_text = t("⚠️ Photon FULLサポート(元)のみ → 最適化へペナルティ (+3%)",
+                                  "⚠️ Photon FULL support on original only; penalty for optimized (+3%)")
+        else:
+            photon_bonus_text = t("➖ Photon FULLサポート調整なし",
+                                  "➖ No Photon FULL support adjustment")
+    except Exception as e:
+        photon_bonus_text = t(f"⚠️ Photonサポート判定に失敗: {str(e)}",
+                              f"⚠️ Failed to evaluate Photon support: {str(e)}")
+    
+    if abs(photon_adjustment_factor - 1.0) > 1e-6:
+        adjusted_ratio = final_comprehensive_ratio * photon_adjustment_factor
+        print(t(f"   Photon調整係数     : {photon_adjustment_factor:.3f}",
+                 f"   Photon adjustment factor: {photon_adjustment_factor:.3f}"))
+        print(t(f"   Photon調整詳細     : {photon_bonus_text}",
+                 f"   Photon adjustment details: {photon_bonus_text}"))
+        print(t(f"   調整後総合比率     : {adjusted_ratio:.4f}",
+                 f"   Adjusted final ratio    : {adjusted_ratio:.4f}"))
+        print(t(f"   調整後改善率       : {(1 - adjusted_ratio)*100:+.2f}%",
+                 f"   Adjusted improvement    : {(1 - adjusted_ratio)*100:+.2f}%"))
+        final_comprehensive_ratio = adjusted_ratio
+    else:
+        print(t(f"   Photon調整          : {photon_bonus_text}",
+                 f"   Photon adjustment      : {photon_bonus_text}"))
+    
     # 判定結果
     judgment = {
         'comprehensive_cost_ratio': final_comprehensive_ratio,
         'original_comprehensive_ratio': comprehensive_ratio,
         'spill_improvement_factor': spill_improvement_factor,
         'component_analysis': component_ratios,
-        'detailed_analysis': detailed_ratios
+        'detailed_analysis': detailed_ratios,
+        'photon_adjustment_factor': photon_adjustment_factor,
+        'photon_full_support_original': photon_full_support_original,
+        'photon_full_support_optimized': photon_full_support_optimized
     }
     
     # 総合判定（保守的アプローチ）
