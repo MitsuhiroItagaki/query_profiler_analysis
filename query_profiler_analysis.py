@@ -32,6 +32,8 @@
 
 # COMMAND ----------
 
+from typing import Any, Dict, List, Optional
+
 # MAGIC %md
 # MAGIC # 🔧 Configuration & Setup Section
 # MAGIC
@@ -323,6 +325,9 @@ def extract_optimization_points_from_query(query: str, trial_type: str, attempt_
         optimization_points.append("⚡ General query structure optimization")
     
     return f"Trial {attempt_num} ({trial_type}): {'; '.join(optimization_points)}"
+ 
+# Ensure typing names are available in this cell context
+from typing import Any, Dict, List, Optional
 
 def save_optimization_points_summary(
     optimization_point: str,
@@ -655,9 +660,8 @@ print("=" * 50)
 # ⚙️ Basic environment configuration
 import json
 # pandas is not used; import removed to avoid unnecessary dependency
-from typing import Dict, List, Any, Optional
 from datetime import datetime
-
+ 
 print("✅ Basic library import completed")
 print("🚀 Please proceed to the next cell")
 
