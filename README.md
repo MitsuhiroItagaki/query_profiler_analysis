@@ -85,23 +85,6 @@ LLM_CONFIG = {
 
 4. Run all cells. The tool will analyze the profiler JSON, generate an optimization report, and optionally refine it via the configured LLM.
 
-### Option B: Run locally (limited mode)
-This script can run as a plain Python file for report generation/refinement that doesn’t require Spark. Set it to avoid EXPLAIN and use a local JSON path.
-
-1. Prepare inputs: a Databricks SQL Profiler JSON file on your local filesystem.
-2. Edit the config block at the top of `query_profiler_analysis.py`:
-   - Set `JSON_FILE_PATH` to your local path (e.g., `/path/to/profiler.json`).
-   - Set `OUTPUT_LANGUAGE` to `'en'` or `'ja'`.
-   - Set `EXPLAIN_ENABLED = 'N'` to skip Databricks-dependent EXPLAIN steps.
-   - Optionally configure `LLM_CONFIG` for OpenAI/Azure/Anthropic if you want refinement.
-3. Run:
-
-```bash
-python3 query_profiler_analysis.py
-```
-
-Note: Some Databricks-only features (e.g., executing EXPLAIN against a Databricks cluster) are unavailable locally; keep `EXPLAIN_ENABLED = 'N'` outside of Databricks.
-
 ## Inputs
 - Databricks SQL Profiler JSON produced by SQL Warehouse/DBSQL, containing plan graphs and metrics (expects keys like `graphs`).
 
@@ -127,7 +110,6 @@ Environment variables you can use instead of hardcoding keys:
 
 ## Troubleshooting
 - If no report files are generated, ensure the main analysis cells ran to completion and the input JSON path is correct.
-- For local runs, set `EXPLAIN_ENABLED='N'` and avoid Databricks-only features.
 - Increase verbosity by setting `DEBUG_ENABLED='Y'` to keep intermediate artifacts for inspection.
 
 ## License

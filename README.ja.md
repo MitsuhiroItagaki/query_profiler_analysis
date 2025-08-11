@@ -85,23 +85,6 @@ LLM_CONFIG = {
 
 4. すべてのセルを実行します。プロファイラー JSON を解析し、最適化レポートを生成し、必要に応じて LLM で推敲します。
 
-### 方法 B: ローカルで実行（一部機能限定）
-Spark に依存しない範囲のレポート生成/推敲をローカルで実行できます。EXPLAIN を無効化し、ローカルの JSON パスを使用してください。
-
-1. 入力として Databricks SQL Profiler の JSON をローカルに用意します。
-2. `query_profiler_analysis.py` の冒頭の設定ブロックを編集します。
-   - `JSON_FILE_PATH` にローカルパス（例: `/path/to/profiler.json`）を設定
-   - `OUTPUT_LANGUAGE` を `'ja'` または `'en'` に設定
-   - `EXPLAIN_ENABLED = 'N'` に設定（Databricks 依存の処理を回避）
-   - 必要に応じて OpenAI/Azure/Anthropic の `LLM_CONFIG` を設定
-3. 実行:
-
-```bash
-python3 query_profiler_analysis.py
-```
-
-注: Databricks 専用機能（クラスターに対する EXPLAIN 実行など）はローカルでは利用できません。ローカルでは `EXPLAIN_ENABLED = 'N'` を推奨します。
-
 ## 入力
 - SQL Warehouse/DBSQL が出力する Databricks SQL Profiler の JSON（`graphs` 等のキーを含む）
 
@@ -127,7 +110,6 @@ API キーは環境変数でも設定可能:
 
 ## トラブルシューティング
 - レポートが生成されない場合は、解析セルが最後まで実行されたか、入力 JSON パスが正しいか確認してください。
-- ローカル実行時は `EXPLAIN_ENABLED='N'` を推奨し、Databricks 固有の処理を避けてください。
 - `DEBUG_ENABLED='Y'` で中間成果物を保持し可視性を上げられます。
 
 ## ライセンス
