@@ -16123,5 +16123,25 @@ else:
 
 print()
 
+# 🧹 Additional cleanup for non-debug mode
+try:
+    _debug_enabled_final = globals().get('DEBUG_ENABLED', 'N')
+    if str(_debug_enabled_final).upper() != 'Y':
+        import os
+        _additional_text_files = ["optimization_points_summary.txt", "trial_logs.txt"]
+        _deleted_count = 0
+        for _file_path in _additional_text_files:
+            try:
+                if os.path.exists(_file_path):
+                    os.remove(_file_path)
+                    print(f"✅ Deletion completed: {_file_path}")
+                    _deleted_count += 1
+            except Exception as _e:
+                print(f"❌ Deletion failed: {_file_path} - {str(_e)}")
+        if _deleted_count == 0:
+            print("📁 No additional intermediate text files found for deletion")
+except Exception as _e:
+    print(f"⚠️ Cleanup step encountered an error: {str(_e)}")
+
 print("🎉 All processing completed!")
 print("📁 Please check the generated files and utilize the analysis results.")
