@@ -44,7 +44,7 @@ DEBUG_ENABLED = 'Y'
 MAX_OPTIMIZATION_ATTEMPTS = 2
 ```
 
-3. LLM プロバイダーを設定（任意: レポート推敲を行う場合）:
+3. LLM プロバイダーを設定（必須）:
 
 ```python
 LLM_CONFIG = {

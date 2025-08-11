@@ -44,7 +44,7 @@ DEBUG_ENABLED = 'Y'
 MAX_OPTIMIZATION_ATTEMPTS = 2
 ```
 
-3. Configure LLM provider (optional, only if you want AI-based report refinement):
+3. Configure LLM provider (required):
 
 ```python
 LLM_CONFIG = {
