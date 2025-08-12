@@ -38,7 +38,7 @@ OUTPUT_LANGUAGE = 'ja'
 EXPLAIN_ENABLED = 'Y'
 
 # Preserve intermediate files if 'Y'
-DEBUG_ENABLED = 'Y'
+DEBUG_ENABLED = 'N'
 
 # Max number of iterative optimization attempts
 MAX_OPTIMIZATION_ATTEMPTS = 2

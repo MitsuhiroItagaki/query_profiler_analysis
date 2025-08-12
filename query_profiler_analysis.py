@@ -78,7 +78,7 @@ OUTPUT_LANGUAGE = 'ja'
 EXPLAIN_ENABLED = 'Y'
 
 # 🐛 Debug mode setting (DEBUG_ENABLED: 'Y' = keep intermediate files, 'N' = keep final files only)
-DEBUG_ENABLED = 'Y'
+DEBUG_ENABLED = 'N'
 
 # Register a robust cleanup to ensure text files are removed when DEBUG is disabled
 try:
