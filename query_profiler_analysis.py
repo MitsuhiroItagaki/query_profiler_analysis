@@ -16159,6 +16159,22 @@ try:
                     _deleted_count += 1
             except Exception as _e:
                 print(f"❌ Deletion failed: {_file_path} - {str(_e)}")
+        
+        # 🚮 Also remove performance judgment logs when debug is disabled
+        try:
+            import glob
+            _perf_log_files = glob.glob("output_performance_judgment_log_*.txt")
+            for _file_path in _perf_log_files:
+                try:
+                    if os.path.exists(_file_path):
+                        os.remove(_file_path)
+                        print(f"✅ Deletion completed: {_file_path}")
+                        _deleted_count += 1
+                except Exception as _e:
+                    print(f"❌ Deletion failed: {_file_path} - {str(_e)}")
+        except Exception as _e:
+            print(f"⚠️ Cleanup step for performance judgment logs encountered an error: {str(_e)}")
+        
         if _deleted_count == 0:
             print("📁 No additional intermediate text files found for deletion")
 except Exception as _e:
