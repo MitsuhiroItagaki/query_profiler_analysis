@@ -3167,7 +3167,7 @@ def get_liquid_clustering_guidelines(language: str = None) -> str:
     """
     lang = (language or str(globals().get('OUTPUT_LANGUAGE', 'ja'))).lower()
     if lang == 'en':
-        return """### 🧭 Key Selection Guidelines
+        return """#### 🧭 Key Selection Principles
 
 - Principle: Liquid Clustering is a read-optimization via data skipping on filter columns. Prioritize columns frequently used in filters when selecting keys.
 - Notes when proposing a GROUP BY key (these conditions can indirectly improve shuffle efficiency):
@@ -3179,7 +3179,7 @@ def get_liquid_clustering_guidelines(language: str = None) -> str:
     This reduces the “local unique group count” per file, amplifying the partial aggregation effect.
 - Practical tip: If these conditions are not met, always favor filter columns."""
     else:
-        return """### 🧭 キー選定ガイドライン
+        return """#### 🧭 キー選定の原則
 
 - 原則: Liquid Clustering はフィルタ列での読み取り最適化（データスキッピング）です。キー選定は「よく絞り込みに使う列」を第一優先にしてください。
 - GROUP BY キーを提案する場合の注意（次の条件が揃うと間接的にシャッフル効率が改善することがあります）:
@@ -9830,8 +9830,6 @@ def generate_comprehensive_optimization_report(query_id: str, optimized_result: 
 
 {llm_analysis}
 
-{get_liquid_clustering_guidelines('ja')}
-
 """
         
         # 最も時間がかかっている処理TOP10を統合
@@ -10130,8 +10128,6 @@ The following topics are analyzed for process evaluation:
 
 {llm_analysis}
 
-{get_liquid_clustering_guidelines('en')}
-
 """
         
         # SQL最適化分析結果の追加（英語版）
@@ -10378,9 +10374,9 @@ Please check:
         _guidelines_text = get_liquid_clustering_guidelines()
         if ("キー選定ガイドライン" not in report) and ("Key Selection Guidelines" not in report):
             if OUTPUT_LANGUAGE == 'ja':
-                report += "\n## 📘 付録: Liquid Clustering キー選定ガイドライン\n\n" + _guidelines_text + "\n"
+                report += "\n## 📋 テーブル最適化推奨\n\n### 📘 Liquid Clustering キー選定ガイドライン\n\n" + _guidelines_text + "\n"
             else:
-                report += "\n## 📘 Appendix: Liquid Clustering Key Selection Guidelines\n\n" + _guidelines_text + "\n"
+                report += "\n## 📋 Table Optimization Recommendations\n\n### 📘 Liquid Clustering Key Selection Guidelines\n\n" + _guidelines_text + "\n"
     except Exception:
         pass
     
@@ -11282,9 +11278,9 @@ def save_optimized_sql_files(original_query: str, optimized_result: str, metrics
         _gl_text = get_liquid_clustering_guidelines()
         if ("キー選定ガイドライン" not in refined_report) and ("Key Selection Guidelines" not in refined_report):
             if OUTPUT_LANGUAGE == 'ja':
-                refined_report += "\n## 📘 付録: Liquid Clustering キー選定ガイドライン\n\n" + _gl_text + "\n"
+                refined_report += "\n## 📋 テーブル最適化推奨\n\n### 📘 Liquid Clustering キー選定ガイドライン\n\n" + _gl_text + "\n"
             else:
-                refined_report += "\n## 📘 Appendix: Liquid Clustering Key Selection Guidelines\n\n" + _gl_text + "\n"
+                refined_report += "\n## 📋 Table Optimization Recommendations\n\n### 📘 Liquid Clustering Key Selection Guidelines\n\n" + _gl_text + "\n"
     except Exception:
         pass
     
