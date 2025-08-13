@@ -80,27 +80,6 @@ EXPLAIN_ENABLED = 'Y'
 # 🐛 Debug mode setting (DEBUG_ENABLED: 'Y' = keep intermediate files, 'N' = keep final files only)
 DEBUG_ENABLED = 'Y'
 
-# Register a robust cleanup to ensure text files are removed when DEBUG is disabled
-try:
-    import atexit
-    import os as _os_for_cleanup
-
-    def _cleanup_text_files_when_debug_disabled() -> None:
-        debug_flag = str(globals().get('DEBUG_ENABLED', 'N')).upper()
-        if debug_flag != 'Y':
-            for _fname in ("optimization_points_summary.txt", "trial_logs.txt"):
-                try:
-                    if _os_for_cleanup.path.exists(_fname):
-                        _os_for_cleanup.remove(_fname)
-                except Exception:
-                    # Silent best-effort cleanup; detailed logging happens in final cleanup
-                    pass
-
-    atexit.register(_cleanup_text_files_when_debug_disabled)
-except Exception:
-    # If atexit is unavailable, rely on end-of-script cleanup defined later
-    pass
-
 # 🚀 Iterative optimization maximum attempt count settings (MAX_OPTIMIZATION_ATTEMPTS: default 2 times)
 # Number of improvement attempts when performance degradation is detected
 # - 1st attempt: Initial optimization query generation and performance verification
@@ -286,6 +265,27 @@ STRICT_VALIDATION_MODE = 'N'
 DEBUG_JSON_ENABLED = 'N'
 
 # COMMAND ----------
+
+# Register a robust cleanup to ensure text files are removed when DEBUG is disabled
+try:
+    import atexit
+    import os as _os_for_cleanup
+
+    def _cleanup_text_files_when_debug_disabled() -> None:
+        debug_flag = str(globals().get('DEBUG_ENABLED', 'N')).upper()
+        if debug_flag != 'Y':
+            for _fname in ("optimization_points_summary.txt", "trial_logs.txt"):
+                try:
+                    if _os_for_cleanup.path.exists(_fname):
+                        _os_for_cleanup.remove(_fname)
+                except Exception:
+                    # Silent best-effort cleanup; detailed logging happens in final cleanup
+                    pass
+
+    atexit.register(_cleanup_text_files_when_debug_disabled)
+except Exception:
+    # If atexit is unavailable, rely on end-of-script cleanup defined later
+    pass
 
 # === 🎯 Query Optimization Points Extraction Functions ===
 
