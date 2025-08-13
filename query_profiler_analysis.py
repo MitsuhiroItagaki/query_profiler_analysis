@@ -4527,7 +4527,7 @@ if not os.path.exists(JSON_FILE_PATH):
         _guidelines_text = get_liquid_clustering_guidelines()
         from datetime import datetime as _dt
         _ts = _dt.now().strftime("%Y%m%d_%H%M%S")
-        _guidelines_path = f"/workspace/liquid_clustering_guidelines_{_ts}.md"
+        _guidelines_path = f"/workspace/output_liquid_clustering_guidelines_{_ts}.md"
         with open(_guidelines_path, "w", encoding="utf-8") as _gf:
             _gf.write(_guidelines_text + "\n")
         print(f"💾 Guidelines saved (pre-flight): {_guidelines_path}")
@@ -5540,7 +5540,7 @@ print("\n" + guidelines_text)
 try:
     from datetime import datetime as _dt
     _ts = _dt.now().strftime("%Y%m%d_%H%M%S")
-    _guidelines_path = f"/workspace/liquid_clustering_guidelines_{_ts}.md"
+    _guidelines_path = f"/workspace/output_liquid_clustering_guidelines_{_ts}.md"
     with open(_guidelines_path, 'w', encoding='utf-8') as _gf:
         _gf.write(guidelines_text + "\n")
     print(f"💾 Guidelines saved: {_guidelines_path}")
