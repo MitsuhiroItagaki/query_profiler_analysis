@@ -4522,6 +4522,17 @@ if not os.path.exists(JSON_FILE_PATH):
     print("   3. If file is in DBFS FileStore:")
     print("      - /FileStore/shared_uploads/your_username/filename.json")
     print("⚠️ Stopping processing.")
+    # Ensure guidelines file is emitted even when the input JSON file is missing
+    try:
+        _guidelines_text = get_liquid_clustering_guidelines()
+        from datetime import datetime as _dt
+        _ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+        _guidelines_path = f"/workspace/liquid_clustering_guidelines_{_ts}.md"
+        with open(_guidelines_path, "w", encoding="utf-8") as _gf:
+            _gf.write(_guidelines_text + "\n")
+        print(f"💾 Guidelines saved (pre-flight): {_guidelines_path}")
+    except Exception as _e:
+        print(f"⚠️ Failed to save guidelines pre-flight: {_e}")
     raise RuntimeError(f"Specified file not found: {JSON_FILE_PATH}")
 
 # Load SQL profiler JSON file
