@@ -3983,6 +3983,10 @@ def analyze_bottlenecks_with_llm(metrics: Dict[str, Any]) -> str:
                 expression = col.get('expression', 'Unknown')
                 report_lines.append(f"  {i}. `{expression}`")
             report_lines.append("")
+        
+        # 付記: キー選定ガイドライン
+        report_lines.append(get_liquid_clustering_guidelines())
+        report_lines.append("")
     
     # 実装SQL例
     if identified_tables:
