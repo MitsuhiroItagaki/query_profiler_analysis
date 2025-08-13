@@ -11276,11 +11276,32 @@ def save_optimized_sql_files(original_query: str, optimized_result: str, metrics
     
     # LLMでレポートを推敲（詳細な技術情報を保持）
     refined_report = refine_report_with_llm(initial_report, query_id)
+
+    # ✅ 最終レポートからガイドラインが除去された場合に備え再付与
+    try:
+        _gl_text = get_liquid_clustering_guidelines()
+        if ("キー選定ガイドライン" not in refined_report) and ("Key Selection Guidelines" not in refined_report):
+            if OUTPUT_LANGUAGE == 'ja':
+                refined_report += "\n## 📘 付録: Liquid Clustering キー選定ガイドライン\n\n" + _gl_text + "\n"
+            else:
+                refined_report += "\n## 📘 Appendix: Liquid Clustering Key Selection Guidelines\n\n" + _gl_text + "\n"
+    except Exception:
+        pass
     
     with open(report_filename, 'w', encoding='utf-8') as f:
         f.write(refined_report)
     
     print(f"✅ Report file saving completed: {report_filename}")
+
+    # 💾 ガイドラインを常に個別ファイルとしても保存
+    try:
+        _guidelines_text = get_liquid_clustering_guidelines()
+        _guidelines_path = f"/workspace/output_liquid_clustering_guidelines_{timestamp}.md"
+        with open(_guidelines_path, 'w', encoding='utf-8') as _gf:
+            _gf.write(_guidelines_text + "\n")
+        print(f"💾 Guidelines saved: {_guidelines_path}")
+    except Exception as _e:
+        print(f"⚠️ Failed to save guidelines: {_e}")
     
     # Output file results (analysis file generation removed)
     result = {
@@ -16270,10 +16291,6 @@ try:
         for _pattern in (
             "liquid_clustering_analysis_*.md",
             "/workspace/liquid_clustering_analysis_*.md",
-            "output_liquid_clustering_guidelines_*.md",
-            "/workspace/output_liquid_clustering_guidelines_*.md",
-            "liquid_clustering_guidelines_*.md",
-            "/workspace/liquid_clustering_guidelines_*.md",
         ):
             for _md in glob.glob(_pattern):
                 try:
