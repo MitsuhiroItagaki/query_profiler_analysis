@@ -3106,7 +3106,7 @@ def validate_and_filter_clustering_recommendations(llm_analysis: str, extracted_
         print("✅ No problematic reordering recommendations found in LLM response")
         return llm_analysis
 
-def save_liquid_clustering_analysis(clustering_analysis: Dict[str, Any], output_dir: str = "/tmp") -> Dict[str, str]:
+def save_liquid_clustering_analysis(clustering_analysis: Dict[str, Any], output_dir: str = "/workspace") -> Dict[str, str]:
     """
     Liquid Clustering分析結果をファイルに出力
     """
@@ -5545,7 +5545,7 @@ print(f"   🎯 Filter rate: {performance_context.get('data_selectivity', 0):.4f
 # Output analysis results to file
 print(f"\n💾 Outputting analysis results to file...")
 try:
-    saved_files = save_liquid_clustering_analysis(liquid_analysis, "/tmp")
+    saved_files = save_liquid_clustering_analysis(liquid_analysis, "/workspace")
     
     if "error" in saved_files:
         print(f"❌ File output error: {saved_files['error']}")
@@ -16224,3 +16224,18 @@ except Exception as _e:
 
 print("🎉 All processing completed!")
 print("📁 Please check the generated files and utilize the analysis results.")
+
+# 🧹 Cleanup: Remove liquid_clustering_analysis_*.md in debug mode
+try:
+    _debug_enabled_cleanup = str(globals().get('DEBUG_ENABLED', 'N')).upper()
+    if _debug_enabled_cleanup == 'Y':
+        import glob
+        import os
+        for _md in glob.glob("liquid_clustering_analysis_*.md"):
+            try:
+                os.remove(_md)
+                print(f"🧹 Deleted liquid clustering markdown (DEBUG mode): {_md}")
+            except Exception as _e:
+                print(f"⚠️ Failed to delete {_md}: {_e}")
+except Exception as _e:
+    print(f"⚠️ Cleanup step for liquid clustering markdown encountered an error: {str(_e)}")
