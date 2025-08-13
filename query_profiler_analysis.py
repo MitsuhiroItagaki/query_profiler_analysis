@@ -3985,6 +3985,10 @@ def analyze_bottlenecks_with_llm(metrics: Dict[str, Any]) -> str:
             report_lines.append("")
     
     # 付記: キー選定ガイドライン（常に表示）
+    report_lines.append("## 📋 テーブル最適化推奨")
+    report_lines.append("")
+    report_lines.append("### 📘 Liquid Clustering キー選定ガイドライン")
+    report_lines.append("")
     report_lines.append(get_liquid_clustering_guidelines())
     report_lines.append("")
     
@@ -10372,7 +10376,7 @@ Please check:
     # Append Liquid Clustering guidelines as an appendix if not already included
     try:
         _guidelines_text = get_liquid_clustering_guidelines()
-        if ("キー選定ガイドライン" not in report) and ("Key Selection Guidelines" not in report):
+        if ("### 📘 Liquid Clustering キー選定ガイドライン" not in report) and ("### 📘 Liquid Clustering Key Selection Guidelines" not in report):
             if OUTPUT_LANGUAGE == 'ja':
                 report += "\n## 📋 テーブル最適化推奨\n\n### 📘 Liquid Clustering キー選定ガイドライン\n\n" + _guidelines_text + "\n"
             else:
@@ -11276,7 +11280,7 @@ def save_optimized_sql_files(original_query: str, optimized_result: str, metrics
     # ✅ 最終レポートからガイドラインが除去された場合に備え再付与
     try:
         _gl_text = get_liquid_clustering_guidelines()
-        if ("キー選定ガイドライン" not in refined_report) and ("Key Selection Guidelines" not in refined_report):
+        if ("### 📘 Liquid Clustering キー選定ガイドライン" not in refined_report) and ("### 📘 Liquid Clustering Key Selection Guidelines" not in refined_report):
             if OUTPUT_LANGUAGE == 'ja':
                 refined_report += "\n## 📋 テーブル最適化推奨\n\n### 📘 Liquid Clustering キー選定ガイドライン\n\n" + _gl_text + "\n"
             else:
