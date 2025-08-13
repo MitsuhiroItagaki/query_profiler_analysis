@@ -5523,7 +5523,18 @@ else:
     print("❌ LLM analysis results not found")
 
 # 付記: キー選定ガイドラインを表示
-print("\n" + get_liquid_clustering_guidelines())
+guidelines_text = get_liquid_clustering_guidelines()
+print("\n" + guidelines_text)
+# Persist guidelines to a file for verification
+try:
+    from datetime import datetime as _dt
+    _ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+    _guidelines_path = f"/workspace/liquid_clustering_guidelines_{_ts}.md"
+    with open(_guidelines_path, 'w', encoding='utf-8') as _gf:
+        _gf.write(guidelines_text + "\n")
+    print(f"💾 Guidelines saved: {_guidelines_path}")
+except Exception as _e:
+    print(f"⚠️ Failed to save guidelines: {_e}")
 
 # 抽出データの概要を表示
 extracted_data = liquid_analysis.get('extracted_data', {})
