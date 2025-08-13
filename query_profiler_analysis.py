@@ -5525,14 +5525,16 @@ else:
 # 付記: キー選定ガイドラインを表示
 guidelines_text = get_liquid_clustering_guidelines()
 print("\n" + guidelines_text)
-# Persist guidelines to a file for verification
+# Persist guidelines to a file only when DEBUG is enabled; otherwise rely on cleanup
 try:
-    from datetime import datetime as _dt
-    _ts = _dt.now().strftime("%Y%m%d_%H%M%S")
-    _guidelines_path = f"/workspace/liquid_clustering_guidelines_{_ts}.md"
-    with open(_guidelines_path, 'w', encoding='utf-8') as _gf:
-        _gf.write(guidelines_text + "\n")
-    print(f"💾 Guidelines saved: {_guidelines_path}")
+    _debug_flag = str(globals().get('DEBUG_ENABLED', 'N')).upper()
+    if _debug_flag == 'Y':
+        from datetime import datetime as _dt
+        _ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+        _guidelines_path = f"/workspace/output_liquid_clustering_guidelines_{_ts}.md"
+        with open(_guidelines_path, 'w', encoding='utf-8') as _gf:
+            _gf.write(guidelines_text + "\n")
+        print(f"💾 Guidelines saved: {_guidelines_path}")
 except Exception as _e:
     print(f"⚠️ Failed to save guidelines: {_e}")
 
@@ -16245,7 +16247,12 @@ try:
     if _debug_enabled_cleanup != 'Y':
         import glob
         import os
-        for _pattern in ("liquid_clustering_analysis_*.md", "/workspace/liquid_clustering_analysis_*.md"):
+        for _pattern in (
+                "liquid_clustering_analysis_*.md",
+                "/workspace/liquid_clustering_analysis_*.md",
+                "output_liquid_clustering_guidelines_*.md",
+                "/workspace/output_liquid_clustering_guidelines_*.md",
+            ):
             for _md in glob.glob(_pattern):
                 try:
                     os.remove(_md)
