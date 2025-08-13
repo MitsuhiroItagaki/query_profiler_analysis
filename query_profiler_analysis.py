@@ -4527,7 +4527,7 @@ if not os.path.exists(JSON_FILE_PATH):
         _guidelines_text = get_liquid_clustering_guidelines()
         from datetime import datetime as _dt
         _ts = _dt.now().strftime("%Y%m%d_%H%M%S")
-        _guidelines_path = f"/workspace/liquid_clustering_guidelines_{_ts}.md"
+        _guidelines_path = f"/workspace/output_liquid_clustering_guidelines_{_ts}.md"
         with open(_guidelines_path, "w", encoding="utf-8") as _gf:
             _gf.write(_guidelines_text + "\n")
         print(f"💾 Guidelines saved (pre-flight): {_guidelines_path}")
@@ -5540,7 +5540,7 @@ print("\n" + guidelines_text)
 try:
     from datetime import datetime as _dt
     _ts = _dt.now().strftime("%Y%m%d_%H%M%S")
-    _guidelines_path = f"/workspace/liquid_clustering_guidelines_{_ts}.md"
+    _guidelines_path = f"/workspace/output_liquid_clustering_guidelines_{_ts}.md"
     with open(_guidelines_path, 'w', encoding='utf-8') as _gf:
         _gf.write(guidelines_text + "\n")
     print(f"💾 Guidelines saved: {_guidelines_path}")
@@ -10372,6 +10372,17 @@ Please check:
     optimization_points_summary = load_optimization_points_summary()
     if optimization_points_summary:
         report += "\n" + optimization_points_summary
+    
+    # Append Liquid Clustering guidelines as an appendix if not already included
+    try:
+        _guidelines_text = get_liquid_clustering_guidelines()
+        if ("キー選定ガイドライン" not in report) and ("Key Selection Guidelines" not in report):
+            if OUTPUT_LANGUAGE == 'ja':
+                report += "\n## 📘 付録: Liquid Clustering キー選定ガイドライン\n\n" + _guidelines_text + "\n"
+            else:
+                report += "\n## 📘 Appendix: Liquid Clustering Key Selection Guidelines\n\n" + _guidelines_text + "\n"
+    except Exception:
+        pass
     
     return report
 
@@ -16256,7 +16267,14 @@ try:
     if _debug_enabled_cleanup != 'Y':
         import glob
         import os
-        for _pattern in ("liquid_clustering_analysis_*.md", "/workspace/liquid_clustering_analysis_*.md"):
+        for _pattern in (
+            "liquid_clustering_analysis_*.md",
+            "/workspace/liquid_clustering_analysis_*.md",
+            "output_liquid_clustering_guidelines_*.md",
+            "/workspace/output_liquid_clustering_guidelines_*.md",
+            "liquid_clustering_guidelines_*.md",
+            "/workspace/liquid_clustering_guidelines_*.md",
+        ):
             for _md in glob.glob(_pattern):
                 try:
                     os.remove(_md)
