@@ -3170,20 +3170,30 @@ def get_liquid_clustering_guidelines(language: str = None) -> str:
         return """#### Key Selection Principles
 - Principle: Liquid Clustering focuses on read optimization via data skipping on filter columns
 - Priority: Select columns that are frequently used for filtering as the first priority
-- GROUP BY key consideration conditions:
-  1. When a column used for filters also appears in GROUP BY
-  2. When a reduction in the volume of intermediate data sent through shuffle is expected
-  3. When the key has low to medium cardinality with minimal extreme skew
-- Practical recommendation: If the above conditions are not met, always prioritize filter columns"""
+
+#### GROUP BY Key Consideration Conditions
+
+1. When a column used for filters also appears in GROUP BY
+2. When a reduction in the volume of intermediate data sent through shuffle is expected
+3. When the key has low to medium cardinality with minimal extreme skew
+
+#### Practical Recommendations
+
+If the above conditions are not met, always prioritize filter columns"""
     else:
         return """#### キー選定の原則
-- **基本原則**: Liquid Clusteringはフィルタ列での読み取り最適化（データスキッピング）が主目的
+- **基本原則**: フィルタ列での読み取り最適化（データスキッピング）を優先
 - **優先順位**: 「よく絞り込みに使う列」を第一優先に選定
-- **GROUP BY キーの考慮条件**:
-  1. フィルタにも使う列がGROUP BYにも登場する場合
-  2. シャッフルに乗る中間データ量の削減が見込める場合
-  3. キーのカーディナリティが低〜中程度で極端なスキューが少ない場合
-- **実務上の推奨**: 上記条件を満たさない場合は、常にフィルタ列を優先"""
+
+#### GROUP BY キーの考慮条件
+
+1. フィルタにも使う列がGROUP BYにも登場する場合
+2. シャッフルに乗る中間データ量の削減が見込める場合
+3. キーのカーディナリティが低〜中程度で極端なスキューが少ない場合
+
+#### 実務上の推奨
+
+上記条件を満たさない場合は、常にフィルタ列を優先"""
 
 
 def generate_liquid_clustering_markdown_report(clustering_analysis: Dict[str, Any]) -> str:
