@@ -3160,6 +3160,38 @@ def save_liquid_clustering_analysis(clustering_analysis: Dict[str, Any], output_
         print(f"❌ {error_msg}")
         return {"error": error_msg}
 
+def get_liquid_clustering_guidelines(language: str = None) -> str:
+    """
+    Return Liquid Clustering key selection guidelines in Japanese or English.
+    The language defaults to OUTPUT_LANGUAGE if not specified.
+    """
+    lang = (language or str(globals().get('OUTPUT_LANGUAGE', 'ja'))).lower()
+    if lang == 'en':
+        return """### 🧭 Key Selection Guidelines
+
+- Principle: Liquid Clustering is a read-optimization via data skipping on filter columns. Prioritize columns frequently used in filters when selecting keys.
+- Notes when proposing a GROUP BY key (these conditions can indirectly improve shuffle efficiency):
+  - (1) A column used in filters also appears in GROUP BY
+    LC tends to co-locate records with similar keys within the same files/splits, making map-side partial aggregation (combiners) more effective.
+  - (2) As a result, intermediate data volume for shuffle can decrease (reduced Shuffle Read/Write, fewer spills)
+    However, a shuffle is still required for global aggregation.
+  - (3) The key has low-to-medium cardinality with minimal extreme skew
+    This reduces the “local unique group count” per file, amplifying the partial aggregation effect.
+- Practical tip: If these conditions are not met, always favor filter columns."""
+    else:
+        return """### 🧭 キー選定ガイドライン
+
+- 原則: Liquid Clustering はフィルタ列での読み取り最適化（データスキッピング）です。キー選定は「よく絞り込みに使う列」を第一優先にしてください。
+- GROUP BY キーを提案する場合の注意（次の条件が揃うと間接的にシャッフル効率が改善することがあります）:
+  - (1) フィルタにも使う列が、同時に GROUP BY にも登場
+    LC により同じキー近傍のレコードが同じファイル/スプリットに偏在しやすくなり、Map 側の部分集約（combiner）が効きやすい。
+  - (2) その結果、シャッフルに乗る中間データ量が減る（Shuffle Read/Write 縮小、スピル減）
+    ただしグローバル集約のためのシャッフル自体は必要です。
+  - (3) キーのカーディナリティが低〜中程度で極端なスキューが少ない
+    ファイルごとの「局所的なユニークグループ数」が減り、前述の部分集約効果が出やすい。
+- 実務上の推奨: これらの条件を満たさない場合は、常にフィルタ列を優先してください。"""
+
+
 def generate_liquid_clustering_markdown_report(clustering_analysis: Dict[str, Any]) -> str:
     """
     Liquid Clustering分析結果のMarkdownレポートを生成
@@ -3267,6 +3299,8 @@ def generate_liquid_clustering_markdown_report(clustering_analysis: Dict[str, An
 ## 🤖 LLM分析結果
 
 {llm_analysis}
+
+{get_liquid_clustering_guidelines()}
 
 ## 📋 分析サマリー
 
@@ -9767,6 +9801,8 @@ def generate_comprehensive_optimization_report(query_id: str, optimized_result: 
 
 {llm_analysis}
 
+{get_liquid_clustering_guidelines('ja')}
+
 """
         
         # 最も時間がかかっている処理TOP10を統合
@@ -10064,6 +10100,8 @@ The following topics are analyzed for process evaluation:
 ### 🤖 AI Analysis Results
 
 {llm_analysis}
+
+{get_liquid_clustering_guidelines('en')}
 
 """
         
