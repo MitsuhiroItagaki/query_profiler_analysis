@@ -65,7 +65,7 @@
 # Notebook environment file path configuration (please select from the following options)
 
 # Option 1: Pre-tuning plan file (recommended)
-JSON_FILE_PATH = '/Workspace/Shared/AutoSQLTuning/Query1.json'
+JSON_FILE_PATH = '/workspace/query-profile_01f078dc-e054-132c-9ea0-325160b677c7.json'
 
 # 🗂️ Catalog and database configuration (used when executing EXPLAIN statements)
 CATALOG = 'tpcds'
