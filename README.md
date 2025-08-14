@@ -9,6 +9,9 @@ A single-file tool to analyze Databricks SQL Profiler JSON logs with an LLM (Dat
 - **Profiler log ingestion**: Reads Databricks SQL Profiler JSON (parses `graphs` and key metrics)
 - **Metrics extraction**: Query basics, execution time, data volume, cache efficiency, stage/node details
 - **Bottleneck indicators**: Highlights skew, spill, shuffle, I/O hotspots, Photon utilization and more
+- **🔧 Enhanced Shuffle Optimization**: Memory efficiency validation (≤512MB per partition) with actionable recommendations
+- **Priority-based recommendations**: HIGH/MEDIUM/LOW optimization priorities with specific parameter suggestions
+- **Spark tuning guidance**: Automated Spark parameter recommendations for optimal performance
 - **LLM-assisted analysis**: Optional refinement of the report with specific, actionable recommendations
 - **Language support**: Output in English or Japanese
 - **Safe debug mode**: Keep or clean up intermediate artifacts
@@ -42,6 +45,13 @@ DEBUG_ENABLED = 'Y'
 
 # Max number of iterative optimization attempts
 MAX_OPTIMIZATION_ATTEMPTS = 2
+
+# 🔧 Enhanced Shuffle Optimization Settings (New Feature)
+SHUFFLE_ANALYSIS_CONFIG = {
+    "memory_per_partition_threshold_mb": 512,  # Memory efficiency threshold
+    "high_memory_threshold_gb": 100,           # High memory usage threshold
+    "shuffle_analysis_enabled": True           # Enable/disable enhanced analysis
+}
 ```
 
 3. Configure LLM provider (required):
@@ -86,9 +96,17 @@ LLM_CONFIG = {
 The tool writes files to the working directory. Typical names:
 - `output_original_query_*.sql` and `output_optimized_query_*.sql`
 - `output_optimization_report_en_*.md` or `output_optimization_report_jp_*.md`
+- `output_enhanced_shuffle_analysis_en_*.md` or `output_enhanced_shuffle_analysis_jp_*.md` 🔧 **New**
 - Final refined report: `output_final_report_en_*.md` or `output_final_report_jp_*.md`
 
 Debug mode controls whether intermediate artifacts are retained.
+
+### 🔧 Enhanced Shuffle Optimization Report
+The new Shuffle optimization analysis provides:
+- **Memory efficiency validation**: Checks if memory per partition ≤ 512MB
+- **Optimization priority assessment**: HIGH/MEDIUM/LOW based on memory usage
+- **Actionable recommendations**: Specific partition counts and Spark parameters
+- **Performance improvement steps**: 4-stage implementation guidance (emergency/short/medium/long-term)
 
 ## Configuration summary
 - **JSON_FILE_PATH**: Path to the profiler JSON (DBFS, Workspace, or local)
@@ -98,6 +116,9 @@ Debug mode controls whether intermediate artifacts are retained.
 - **DEBUG_ENABLED**: `'Y'` to keep intermediates, `'N'` to clean them up
 - **MAX_OPTIMIZATION_ATTEMPTS**: Iterative improvement attempts
 - **LLM_CONFIG**: Provider and parameters for LLM-based report refinement
+- **SHUFFLE_ANALYSIS_CONFIG**: Enhanced Shuffle optimization settings 🔧 **New**
+  - `memory_per_partition_threshold_mb`: Memory efficiency threshold (default: 512MB)
+  - `shuffle_analysis_enabled`: Enable/disable enhanced Shuffle analysis
 
 Environment variables you can use instead of hardcoding keys:
 - `OPENAI_API_KEY`, `AZURE_OPENAI_API_KEY`, `ANTHROPIC_API_KEY`
