@@ -1852,24 +1852,24 @@ def extract_detailed_bottleneck_analysis(extracted_metrics: Dict[str, Any], enha
                 should_add_repartition_hint = True
                 repartition_reason = f"Spill({node_analysis['spill_gb']:.2f}GB) improvement"
             
-                    # 新条件: Enhanced Shuffle分析結果を考慮
-        elif enhanced_shuffle_analysis and enhanced_shuffle_analysis.get('shuffle_nodes'):
-            # Enhanced Shuffle分析結果から該当ノードを検索
-            shuffle_nodes = enhanced_shuffle_analysis.get('shuffle_nodes', [])
-            matching_shuffle_node = None
-            node_id = node_analysis["node_id"]  # Fix: Define node_id from node_analysis
-            for shuffle_node in shuffle_nodes:
-                if str(shuffle_node.get('node_id')) == str(node_id):
-                    matching_shuffle_node = shuffle_node
-                    break
-            
-            if matching_shuffle_node:
-                is_memory_efficient = matching_shuffle_node.get('is_memory_efficient', True)
-                memory_per_partition_mb = matching_shuffle_node.get('memory_per_partition_mb', 0)
+            # 新条件: Enhanced Shuffle分析結果を考慮
+            elif enhanced_shuffle_analysis and enhanced_shuffle_analysis.get('shuffle_nodes'):
+                # Enhanced Shuffle分析結果から該当ノードを検索
+                shuffle_nodes = enhanced_shuffle_analysis.get('shuffle_nodes', [])
+                matching_shuffle_node = None
+                node_id = node_analysis["node_id"]  # Fix: Define node_id from node_analysis
+                for shuffle_node in shuffle_nodes:
+                    if str(shuffle_node.get('node_id')) == str(node_id):
+                        matching_shuffle_node = shuffle_node
+                        break
                 
-                if not is_memory_efficient and memory_per_partition_mb > 512:
-                    should_add_repartition_hint = True
-                    repartition_reason = f"Enhanced Shuffle analysis - Memory efficiency improvement ({memory_per_partition_mb:.0f}MB/partition > 512MB threshold)"
+                if matching_shuffle_node:
+                    is_memory_efficient = matching_shuffle_node.get('is_memory_efficient', True)
+                    memory_per_partition_mb = matching_shuffle_node.get('memory_per_partition_mb', 0)
+                    
+                    if not is_memory_efficient and memory_per_partition_mb > 512:
+                        should_add_repartition_hint = True
+                        repartition_reason = f"Enhanced Shuffle analysis - Memory efficiency improvement ({memory_per_partition_mb:.0f}MB/partition > 512MB threshold)"
         
         # フォールバック: 直接メモリ効率の基準（512MB/パーティション）をチェック  
         elif num_tasks > 0:
