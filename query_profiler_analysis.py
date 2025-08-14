@@ -1840,11 +1840,41 @@ def extract_detailed_bottleneck_analysis(extracted_metrics: Dict[str, Any]) -> D
             "severity": "CRITICAL" if duration_ms >= 10000 else "HIGH" if duration_ms >= 5000 else "MEDIUM" if duration_ms >= 1000 else "LOW"
         }
         
-        # Shuffleノードの場合、スピルが検出されている場合のみREPARTITIONヒントを追加
-        if node_analysis["is_shuffle_node"] and spill_detected and spill_bytes > 0:
+        # REPARTITIONヒントの付与条件を拡張
+        # 1. 従来の条件: Shuffleノードでスピルが検出された場合
+        # 2. 新条件: Enhanced Shuffle分析で最適化が必要と判定された場合
+        should_add_repartition_hint = False
+        repartition_reason = ""
+        
+        if node_analysis["is_shuffle_node"]:
+            # 従来の条件: スピル検出
+            if spill_detected and spill_bytes > 0:
+                should_add_repartition_hint = True
+                repartition_reason = f"Spill({node_analysis['spill_gb']:.2f}GB) improvement"
+            
+            # 新条件: Enhanced Shuffle分析結果を考慮
+            # この時点ではまだenhanced_shuffle_analysisは実行されていないため、
+            # メモリ効率の基準（512MB/パーティション）を直接チェック
+            elif num_tasks > 0:
+                memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
+                threshold_mb = 512  # SHUFFLE_ANALYSIS_CONFIG["memory_per_partition_threshold_mb"]
+                
+                if memory_per_partition_mb > threshold_mb:
+                    should_add_repartition_hint = True
+                    repartition_reason = f"Memory efficiency improvement ({memory_per_partition_mb:.0f}MB/partition > {threshold_mb}MB threshold)"
+        
+        if should_add_repartition_hint:
             shuffle_attributes = extract_shuffle_attributes(node)
             if shuffle_attributes:
-                suggested_partitions = max(num_tasks * 2, 200)
+                # パーティション数の計算ロジックを改善
+                if "Memory efficiency improvement" in repartition_reason:
+                    # メモリ効率改善の場合: 目標512MB/パーティションに基づいて計算
+                    memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
+                    target_partitions = int((memory_per_partition_mb / 512) * num_tasks)
+                    suggested_partitions = max(target_partitions, 200, num_tasks * 2)
+                else:
+                    # スピル改善の場合: 従来のロジック
+                    suggested_partitions = max(num_tasks * 2, 200)
                 
                 # Shuffle属性で検出されたカラムを全て使用（完全一致）
                 repartition_columns = ", ".join(shuffle_attributes)
@@ -1853,7 +1883,7 @@ def extract_detailed_bottleneck_analysis(extracted_metrics: Dict[str, Any]) -> D
                     "node_id": node_analysis["node_id"],
                     "attributes": shuffle_attributes,
                     "suggested_sql": f"REPARTITION({suggested_partitions}, {repartition_columns})",
-                    "reason": f"Spill({node_analysis['spill_gb']:.2f}GB) improvement",
+                    "reason": repartition_reason,
                     "priority": "HIGH",
                     "estimated_improvement": "Significant performance improvement expected",
 
@@ -8404,10 +8434,11 @@ Sparkの自動JOIN戦略を使用（エラー回避のためヒントは使用�
 【🔄 REPARTITIONヒント適用ルール - 構文エラー防止】
 REPARTITIONヒントを付与する場合は以下の最適化ルールを守ってください：
 
-🚨 **最重要ルール**: 
-- **❌ スピル未検出時**: REPARTITIONヒントは絶対に適用・記載してはいけない
-- **✅ スピル検出時のみ**: REPARTITIONヒントを適用
-- **⚠️ 記載禁止**: スピルが検出されていない場合、推奨事項や緊急対応に「REPARTITION適用」を含めない
+🚨 **REPARTITIONヒント適用の新しいルール**: 
+- **✅ スピル検出時**: REPARTITIONヒントを適用（従来通り）
+- **✅ メモリ効率悪化時**: メモリ/パーティション > 512MB の場合もREPARTITIONヒントを適用（新機能）
+- **⚠️ 適用条件**: Enhanced Shuffle分析で最適化が必要と判定された場合も対象
+- **📊 判定基準**: スピル検出 OR メモリ効率問題（512MB/パーティション超過）
 
 技術詳細:
 - **REPARTITIONヒントは SELECT /*+ REPARTITION(パーティション数, カラム名) の形式で指定**
@@ -8420,11 +8451,11 @@ REPARTITIONヒントを付与する場合は以下の最適化ルールを守っ
 4. **パーティション数とカラム名は必須パラメータとして指定する**
 
 🚨 **REPARTITIONヒント適用の厳格なルール**：
-- **❌ スピル未検出**: REPARTITIONヒントは絶対に適用しない・記載しない
-- **✅ スピル検出時のみ**: GROUP BY前にREPARTITION(推奨数, group_by_column)
-- **✅ スピル検出時のみ**: JOIN前にREPARTITION(推奨数, join_key)
-- **重要**: スピルが検出されていない場合は「REPARTITIONの適用」を推奨事項に含めない
-- **記載禁止**: スピル未検出時に「緊急対応: REPARTITIONの適用」等を記載してはいけない
+- **✅ スピル検出時**: GROUP BY前にREPARTITION(推奨数, group_by_column)
+- **✅ スピル検出時**: JOIN前にREPARTITION(推奨数, join_key)
+- **✅ メモリ効率悪化時**: メモリ/パーティション > 512MB の場合もREPARTITION適用
+- **📊 新判定基準**: Enhanced Shuffle分析で最適化必要性=YES の場合も適用対象
+- **⚠️ パーティション数計算**: メモリ効率改善時は目標512MB/パーティションで計算
 
 **🚨 CREATE TABLE AS SELECT (CTAS) でのREPARTITION配置の重要な注意事項:**
 - CREATE TABLE AS SELECT文では、トップレベルのSELECT句にREPARTITIONヒントを配置すると、**最終的な出力書き込み段階のみに影響**し、JOIN や集計などの中間処理段階には影響しない

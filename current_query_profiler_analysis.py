@@ -1816,11 +1816,41 @@ def extract_detailed_bottleneck_analysis(extracted_metrics: Dict[str, Any]) -> D
             "severity": "CRITICAL" if duration_ms >= 10000 else "HIGH" if duration_ms >= 5000 else "MEDIUM" if duration_ms >= 1000 else "LOW"
         }
         
-        # Shuffleノードの場合、スピルが検出されている場合のみREPARTITIONヒントを追加
-        if node_analysis["is_shuffle_node"] and spill_detected and spill_bytes > 0:
+        # REPARTITIONヒントの付与条件を拡張
+        # 1. 従来の条件: Shuffleノードでスピルが検出された場合
+        # 2. 新条件: Enhanced Shuffle分析で最適化が必要と判定された場合
+        should_add_repartition_hint = False
+        repartition_reason = ""
+        
+        if node_analysis["is_shuffle_node"]:
+            # 従来の条件: スピル検出
+            if spill_detected and spill_bytes > 0:
+                should_add_repartition_hint = True
+                repartition_reason = f"Spill({node_analysis['spill_gb']:.2f}GB) improvement"
+            
+            # 新条件: Enhanced Shuffle分析結果を考慮
+            # この時点ではまだenhanced_shuffle_analysisは実行されていないため、
+            # メモリ効率の基準（512MB/パーティション）を直接チェック
+            elif num_tasks > 0:
+                memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
+                threshold_mb = 512  # SHUFFLE_ANALYSIS_CONFIG["memory_per_partition_threshold_mb"]
+                
+                if memory_per_partition_mb > threshold_mb:
+                    should_add_repartition_hint = True
+                    repartition_reason = f"Memory efficiency improvement ({memory_per_partition_mb:.0f}MB/partition > {threshold_mb}MB threshold)"
+        
+        if should_add_repartition_hint:
             shuffle_attributes = extract_shuffle_attributes(node)
             if shuffle_attributes:
-                suggested_partitions = max(num_tasks * 2, 200)
+                # パーティション数の計算ロジックを改善
+                if "Memory efficiency improvement" in repartition_reason:
+                    # メモリ効率改善の場合: 目標512MB/パーティションに基づいて計算
+                    memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
+                    target_partitions = int((memory_per_partition_mb / 512) * num_tasks)
+                    suggested_partitions = max(target_partitions, 200, num_tasks * 2)
+                else:
+                    # スピル改善の場合: 従来のロジック
+                    suggested_partitions = max(num_tasks * 2, 200)
                 
                 # Shuffle属性で検出されたカラムを全て使用（完全一致）
                 repartition_columns = ", ".join(shuffle_attributes)
@@ -1829,7 +1859,7 @@ def extract_detailed_bottleneck_analysis(extracted_metrics: Dict[str, Any]) -> D
                     "node_id": node_analysis["node_id"],
                     "attributes": shuffle_attributes,
                     "suggested_sql": f"REPARTITION({suggested_partitions}, {repartition_columns})",
-                    "reason": f"Spill({node_analysis['spill_gb']:.2f}GB) improvement",
+                    "reason": repartition_reason,
                     "priority": "HIGH",
                     "estimated_improvement": "Significant performance improvement expected",
 
