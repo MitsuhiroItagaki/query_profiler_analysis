@@ -8015,6 +8015,79 @@ def generate_optimized_query_with_llm(original_query: str, analysis_result: str,
     # 🚀 セル33スタイルの詳細ボトルネック分析を実行
     detailed_bottleneck = extract_detailed_bottleneck_analysis(metrics)
     
+    # 🔧 Enhanced Shuffle操作最適化分析の抽出・フォーマット
+    enhanced_shuffle_summary = ""
+    enhanced_shuffle_analysis = metrics.get('enhanced_shuffle_analysis', {})
+    
+    if enhanced_shuffle_analysis and enhanced_shuffle_analysis.get('shuffle_nodes'):
+        # Enhanced Shuffle分析結果をプロンプト用に要約
+        overall_assessment = enhanced_shuffle_analysis.get('overall_assessment', {})
+        shuffle_nodes = enhanced_shuffle_analysis.get('shuffle_nodes', [])
+        
+        # サマリー情報
+        total_shuffle_nodes = overall_assessment.get('total_shuffle_nodes', 0)
+        inefficient_nodes = overall_assessment.get('inefficient_nodes', 0)
+        total_memory_gb = overall_assessment.get('total_memory_gb', 0)
+        avg_memory_per_partition_mb = overall_assessment.get('avg_memory_per_partition_mb', 0)
+        needs_optimization = overall_assessment.get('needs_optimization', False)
+        
+        # 効率性スコア計算
+        efficiency_rate = ((total_shuffle_nodes - inefficient_nodes) / total_shuffle_nodes * 100) if total_shuffle_nodes > 0 else 100
+        
+        enhanced_shuffle_summary = f"""
+Shuffle操作数: {total_shuffle_nodes}個（最適化必要: {inefficient_nodes}個）
+総メモリ使用量: {total_memory_gb:.2f}GB
+平均メモリ/パーティション: {avg_memory_per_partition_mb:.1f}MB
+Shuffle効率性スコア: {efficiency_rate:.1f}%
+最適化必要性: {'はい' if needs_optimization else 'いいえ'}
+
+🔍 個別Shuffle操作分析:"""
+        
+        # 上位3つの最も重要なShuffle操作を詳細表示
+        high_priority_nodes = []
+        for node in shuffle_nodes:
+            if node.get('memory_per_partition_mb', 0) > SHUFFLE_ANALYSIS_CONFIG.get('memory_per_partition_threshold_mb', 512):
+                high_priority_nodes.append(node)
+        
+        # 高優先度ノードから最大3つを表示
+        display_nodes = high_priority_nodes[:3] if high_priority_nodes else shuffle_nodes[:3]
+        
+        for i, node in enumerate(display_nodes, 1):
+            node_id = node.get('node_id', 'N/A')
+            memory_per_partition = node.get('memory_per_partition_mb', 0)
+            partition_count = node.get('partition_count', 0)
+            peak_memory_gb = node.get('peak_memory_gb', 0)
+            duration_sec = node.get('duration_sec', 0)
+            priority = node.get('priority', 'LOW')
+            
+            # 優先度アイコン
+            priority_icon = "🚨" if priority == "HIGH" else "💡"
+            
+            enhanced_shuffle_summary += f"""
+
+{i}. Shuffle (Node ID: {node_id})
+   {priority_icon} 優先度: {priority}
+   📊 パーティション数: {partition_count:,}
+   🧠 ピークメモリ: {peak_memory_gb:.2f}GB
+   ⚡ メモリ/パーティション: {memory_per_partition:.1f}MB
+   ⏱️ 実行時間: {duration_sec:.1f}秒"""
+        
+        # 最適化推奨事項
+        if needs_optimization:
+            enhanced_shuffle_summary += f"""
+
+🎯 Shuffle最適化推奨事項:
+- パーティション数の調整（目標: ≤{SHUFFLE_ANALYSIS_CONFIG.get('memory_per_partition_threshold_mb', 512)}MB/パーティション）
+- 高メモリ使用ノードのクラスター拡張検討
+- REPARTITIONヒント適用（スピル検出時のみ）
+- Liquid Clusteringによる根本的Shuffle削減"""
+        else:
+            enhanced_shuffle_summary += """
+
+✅ Shuffle操作は効率的に動作しており、特別な最適化は不要です。"""
+    else:
+        enhanced_shuffle_summary = "Enhanced Shuffle操作最適化分析データが利用できません。"
+    
     # 最適化のためのコンテキスト情報を準備（詳細版）
     optimization_context = []
     performance_critical_issues = []
@@ -8168,6 +8241,9 @@ Sparkの自動JOIN戦略を使用（エラー回避のためヒントは使用�
 
 【パフォーマンス分析結果（サマリー）】
 {analysis_summary}
+
+【🔧 Enhanced Shuffle操作最適化分析】
+{enhanced_shuffle_summary}
 
 【🔍 EXPLAIN結果分析（EXPLAIN_ENABLED=Yの場合のみ）】
 {f'''
