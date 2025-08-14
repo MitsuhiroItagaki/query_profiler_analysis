@@ -51,10 +51,10 @@ if node_analysis["is_shuffle_node"]:
 if "Memory efficiency improvement" in repartition_reason:
     memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
     target_partitions = int((memory_per_partition_mb / 512) * num_tasks)
-    suggested_partitions = max(target_partitions, 200, num_tasks * 2)
+    suggested_partitions = max(target_partitions, num_tasks * 2)
 else:
-    # スピル改善の場合: 従来のロジック
-    suggested_partitions = max(num_tasks * 2, 200)
+    # スピル改善の場合: メモリ効率計算ロジックに統一
+    suggested_partitions = max(target_partitions, num_tasks * 2)
 ```
 
 ## 🎯 **実際の適用例**
