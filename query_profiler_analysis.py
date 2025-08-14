@@ -8263,6 +8263,11 @@ Shuffle効率性スコア: {efficiency_rate:.1f}%
 【🔄 REPARTITIONヒント（スピル検出時のみ）】
 {chr(10).join(repartition_hints) if repartition_hints else "スピルが検出されていないため、REPARTITIONヒントは適用対象外です"}
 
+【🚨 CRITICAL: REPARTITIONパーティション数の注意事項】
+- 上記の具体的な計算済みREPARTITIONヒントが提供されている場合は、その正確な数値を使用してください
+- 200などの固定値は使用せず、必ず分析結果で計算された具体的なパーティション数を適用してください
+- 例：REPARTITION(810, cs_bill_customer_sk) など、分析で推奨された数値を正確に使用
+
 【🚀 処理速度重視の最適化推奨事項】
 {chr(10).join(speed_optimization_recommendations) if speed_optimization_recommendations else "特別な推奨事項はありません"}
 
@@ -8426,7 +8431,7 @@ Sparkの自動JOIN戦略を使用（エラー回避のためヒントは使用�
        JOIN large_table ON small_table.key = large_table.key
    ),
    repartitioned_for_groupby AS (
-     SELECT /*+ REPARTITION(200, group_key) */
+     SELECT /*+ REPARTITION(calculated_partitions, group_key) */
        columns...
      FROM efficient_joined
    )
@@ -8473,7 +8478,7 @@ REPARTITIONヒントを付与する場合は以下の最適化ルールを守っ
 ```sql
 -- ❌ 間違い: トップレベルのSELECT句（書き込み段階のみに影響）
 CREATE TABLE optimized_table AS
-SELECT /*+ REPARTITION(200, join_key) */
+SELECT /*+ REPARTITION(calculated_partitions, join_key) */
   t1.column1, t2.column2
 FROM table1 t1
   JOIN table2 t2 ON t1.join_key = t2.join_key
@@ -8483,7 +8488,7 @@ CREATE TABLE optimized_table AS
 SELECT 
   t1.column1, t2.column2
 FROM (
-  SELECT /*+ REPARTITION(200, join_key) */
+  SELECT /*+ REPARTITION(calculated_partitions, join_key) */
     column1, join_key
   FROM table1
 ) t1
@@ -8499,7 +8504,7 @@ FROM (
 **一般的なクエリでの正しいREPARTITIONヒント配置例:**
 ```sql
 -- ❌ 間違い: トップレベルのSELECT句（最終出力段階のみに影響）
-SELECT /*+ REPARTITION(200, join_key) */
+SELECT /*+ REPARTITION(calculated_partitions, join_key) */
   t1.column1, t2.column2
 FROM table1 t1
   JOIN table2 t2 ON t1.join_key = t2.join_key
@@ -8508,7 +8513,7 @@ FROM table1 t1
 SELECT 
   t1.column1, t2.column2
 FROM (
-  SELECT /*+ REPARTITION(200, join_key) */
+  SELECT /*+ REPARTITION(calculated_partitions, join_key) */
     column1, join_key
   FROM table1
 ) t1
@@ -8518,12 +8523,12 @@ FROM (
 SELECT 
   t1.column1, t2.column2, t3.column3
 FROM (
-  SELECT /*+ REPARTITION(200, join_key) */
+  SELECT /*+ REPARTITION(calculated_partitions, join_key) */
     column1, join_key
   FROM table1
 ) t1
   JOIN (
-    SELECT /*+ REPARTITION(200, join_key) */
+    SELECT /*+ REPARTITION(calculated_partitions, join_key) */
       column2, join_key
     FROM table2
   ) t2 ON t1.join_key = t2.join_key
@@ -8574,7 +8579,7 @@ FROM (
 ✅ **REPARTITIONヒントの正しい配置:**
 ```sql
 -- REPARTITIONヒントはメインクエリのSELECT直後に配置
-SELECT /*+ REPARTITION(200, column_name) */
+SELECT /*+ REPARTITION(calculated_partitions, column_name) */
   column1, column2, ...
 FROM table1 t1
   JOIN table2 t2 ON t1.id = t2.id
@@ -8583,7 +8588,7 @@ FROM table1 t1
 ✅ **DISTINCT句との正しい組み合わせ（絶対必須）:**
 ```sql
 -- 🚨 重要: DISTINCT句は必ずヒント句の後に配置
-SELECT /*+ REPARTITION(200, column_name) */ DISTINCT
+SELECT /*+ REPARTITION(calculated_partitions, column_name) */ DISTINCT
   cs.ID, cs.column1, cs.column2, ...
 FROM table1 cs
   JOIN table2 t2 ON cs.id = t2.id
@@ -8626,9 +8631,9 @@ FROM table1 cs
 
 ```sql
 -- 🚨 重要: REPARTITIONヒントはメインクエリのSELECT文の直後に配置
--- 例: SELECT /*+ REPARTITION(200, column_name) */ column1, column2, ...
--- 🚨 DISTINCT句保持例: SELECT /*+ REPARTITION(200, column_name) */ DISTINCT cs.ID, cs.column1, ...
--- 🚨 REPARTITIONヒントの適切な配置: SELECT /*+ REPARTITION(200, join_key) */ column1, column2, ...
+-- 例: SELECT /*+ REPARTITION(calculated_partitions, column_name) */ column1, column2, ...
+-- 🚨 DISTINCT句保持例: SELECT /*+ REPARTITION(calculated_partitions, column_name) */ DISTINCT cs.ID, cs.column1, ...
+-- 🚨 REPARTITIONヒントの適切な配置: SELECT /*+ REPARTITION(calculated_partitions, join_key) */ column1, column2, ...
 -- ❌ 禁止: BROADCASTヒント（/*+ BROADCAST */、/*+ BROADCAST(table) */）は一切使用禁止
 -- ✅ 推奨: Sparkの自動JOIN戦略に委ねてヒント不使用で最適化
 [完全なSQL - すべてのカラム・CTE・テーブル名を省略なしで記述]
@@ -12793,7 +12798,7 @@ FROM store_sales ss
 
 【🚨 REPARTITIONヒント配置の厳格なルール - エラー修正版】
 - **サブクエリ内部のSELECT文直後に配置**
-- **パーティション数とカラム名は必須**: `/*+ REPARTITION(200, column_name) */`
+- **パーティション数とカラム名は必須**: `/*+ REPARTITION(calculated_partitions, column_name) */`
 - **スピル検出時のみ適用**
 
 【重要な制約 - エラー修正版】
