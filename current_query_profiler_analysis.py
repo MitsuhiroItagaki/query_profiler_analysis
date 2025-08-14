@@ -16759,7 +16759,7 @@ except Exception as _e:
 print("🎉 All processing completed!")
 print("📁 Please check the generated files and utilize the analysis results.")
 
-# 🧹 Cleanup: Remove liquid_clustering_analysis_*.md in non-debug mode
+# 🧹 Cleanup: Remove liquid_clustering_analysis_*.md and output_liquid_clustering_guidelines_*.md in non-debug mode
 try:
     _debug_enabled_cleanup = str(globals().get('DEBUG_ENABLED', 'N')).upper()
     if _debug_enabled_cleanup != 'Y':
@@ -16768,6 +16768,8 @@ try:
         for _pattern in (
             "liquid_clustering_analysis_*.md",
             "/workspace/liquid_clustering_analysis_*.md",
+            "output_liquid_clustering_guidelines_*.md",
+            "/workspace/output_liquid_clustering_guidelines_*.md",
         ):
             for _md in glob.glob(_pattern):
                 try:
