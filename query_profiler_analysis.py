@@ -1685,7 +1685,7 @@ def format_filter_rate_display(filter_result: Dict[str, Any]) -> str:
         files_pruned_gb = filter_result["files_pruned_bytes"] / (1024 * 1024 * 1024)
         return f"📂 Filter rate: {filter_rate:.1%} (read: {files_read_gb:.2f}GB, pruned: {files_pruned_gb:.2f}GB)"
 
-def extract_detailed_bottleneck_analysis(extracted_metrics: Dict[str, Any]) -> Dict[str, Any]:
+def extract_detailed_bottleneck_analysis(extracted_metrics: Dict[str, Any], enhanced_shuffle_analysis: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Perform Cell 33-style detailed bottleneck analysis and return structured data
     
@@ -1852,10 +1852,26 @@ def extract_detailed_bottleneck_analysis(extracted_metrics: Dict[str, Any]) -> D
                 should_add_repartition_hint = True
                 repartition_reason = f"Spill({node_analysis['spill_gb']:.2f}GB) improvement"
             
-            # 新条件: Enhanced Shuffle分析結果を考慮
-            # この時点ではまだenhanced_shuffle_analysisは実行されていないため、
-            # メモリ効率の基準（512MB/パーティション）を直接チェック
-            elif num_tasks > 0:
+                    # 新条件: Enhanced Shuffle分析結果を考慮
+        elif enhanced_shuffle_analysis and enhanced_shuffle_analysis.get('shuffle_nodes'):
+            # Enhanced Shuffle分析結果から該当ノードを検索
+            shuffle_nodes = enhanced_shuffle_analysis.get('shuffle_nodes', [])
+            matching_shuffle_node = None
+            for shuffle_node in shuffle_nodes:
+                if str(shuffle_node.get('node_id')) == node_id:
+                    matching_shuffle_node = shuffle_node
+                    break
+            
+            if matching_shuffle_node:
+                is_memory_efficient = matching_shuffle_node.get('is_memory_efficient', True)
+                memory_per_partition_mb = matching_shuffle_node.get('memory_per_partition_mb', 0)
+                
+                if not is_memory_efficient and memory_per_partition_mb > 512:
+                    should_add_repartition_hint = True
+                    repartition_reason = f"Enhanced Shuffle analysis - Memory efficiency improvement ({memory_per_partition_mb:.0f}MB/partition > 512MB threshold)"
+        
+        # フォールバック: 直接メモリ効率の基準（512MB/パーティション）をチェック  
+        elif num_tasks > 0:
                 peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
                 memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
                 threshold_mb = 512  # SHUFFLE_ANALYSIS_CONFIG["memory_per_partition_threshold_mb"]
@@ -4423,7 +4439,9 @@ def analyze_bottlenecks_with_llm(metrics: Dict[str, Any]) -> str:
     
     # === 4. セル43: 統合最適化処理での詳細ボトルネック分析の取得 ===
     try:
-        detailed_bottleneck = extract_detailed_bottleneck_analysis(metrics)
+        # Enhanced Shuffle分析結果を取得
+        enhanced_shuffle_analysis = metrics.get('enhanced_shuffle_analysis', {})
+        detailed_bottleneck = extract_detailed_bottleneck_analysis(metrics, enhanced_shuffle_analysis)
     except Exception as e:
         print(f"⚠️ Error in detailed bottleneck analysis: {e}")
         detailed_bottleneck = {
@@ -8049,7 +8067,8 @@ def generate_optimized_query_with_llm(original_query: str, analysis_result: str,
         metrics['execution_plan_info'] = plan_info
     
     # 🚀 セル33スタイルの詳細ボトルネック分析を実行
-    detailed_bottleneck = extract_detailed_bottleneck_analysis(metrics)
+    enhanced_shuffle_analysis = metrics.get('enhanced_shuffle_analysis', {})
+    detailed_bottleneck = extract_detailed_bottleneck_analysis(metrics, enhanced_shuffle_analysis)
     
     # 🔧 Enhanced Shuffle操作最適化分析の抽出・フォーマット
     enhanced_shuffle_summary = ""
