@@ -1840,54 +1840,7 @@ def extract_detailed_bottleneck_analysis(extracted_metrics: Dict[str, Any]) -> D
             "severity": "CRITICAL" if duration_ms >= 10000 else "HIGH" if duration_ms >= 5000 else "MEDIUM" if duration_ms >= 1000 else "LOW"
         }
         
-        # REPARTITIONヒントの付与条件を拡張
-        # 1. 従来の条件: Shuffleノードでスピルが検出された場合
-        # 2. 新条件: Enhanced Shuffle分析で最適化が必要と判定された場合
-        should_add_repartition_hint = False
-        repartition_reason = ""
-        
-        if node_analysis["is_shuffle_node"]:
-            # 従来の条件: スピル検出
-            if spill_detected and spill_bytes > 0:
-                should_add_repartition_hint = True
-                repartition_reason = f"Spill({node_analysis['spill_gb']:.2f}GB) improvement"
-            
-            # 新条件: Enhanced Shuffle分析結果を考慮
-            # この時点ではまだenhanced_shuffle_analysisは実行されていないため、
-            # メモリ効率の基準（512MB/パーティション）を直接チェック
-            elif num_tasks > 0:
-                peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
-                memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
-                threshold_mb = 512  # SHUFFLE_ANALYSIS_CONFIG["memory_per_partition_threshold_mb"]
-                
-                if memory_per_partition_mb > threshold_mb:
-                    should_add_repartition_hint = True
-                    repartition_reason = f"Memory efficiency improvement ({memory_per_partition_mb:.0f}MB/partition > {threshold_mb}MB threshold)"
-        
-        if should_add_repartition_hint:
-            shuffle_attributes = extract_shuffle_attributes(node)
-            if shuffle_attributes:
-                # パーティション数の計算ロジック（メモリ効率悪化時統一）
-                # すべてのケースで目標512MB/パーティションに基づいて計算
-                peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
-                memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
-                target_partitions = int((memory_per_partition_mb / 512) * num_tasks)
-                suggested_partitions = max(target_partitions, num_tasks * 2)
-                
-                # Shuffle属性で検出されたカラムを全て使用（完全一致）
-                repartition_columns = ", ".join(shuffle_attributes)
-                
-                repartition_hint = {
-                    "node_id": node_analysis["node_id"],
-                    "attributes": shuffle_attributes,
-                    "suggested_sql": f"REPARTITION({suggested_partitions}, {repartition_columns})",
-                    "reason": repartition_reason,
-                    "priority": "HIGH",
-                    "estimated_improvement": "Significant performance improvement expected",
 
-                }
-                detailed_analysis["shuffle_optimization_hints"].append(repartition_hint)
-                node_analysis["repartition_hint"] = repartition_hint
         
 
         # フィルタ率計算と情報更新
@@ -2167,15 +2120,15 @@ def analyze_enhanced_shuffle_operations(node_metrics: List[Dict[str, Any]], outp
                     "Consider using broadcast JOIN or pre-aggregation"
                 )
         
-        # SQLクエリでのREPARTITIONヒントに関する推奨事項
+        # スピル対策に関する推奨事項
         if not is_memory_efficient:
             if output_language == 'ja':
                 recommendations.append(
-                    "🔧 SQLクエリで発生している場合はREPARTITONヒントもしくはREPARTITON_BY_RANGEヒント(Window関数使用時)を適切に設定してください"
+                    "🔧 メモリ効率改善のため、JOIN順序の最適化やクエリ構造の見直しを行ってください"
                 )
             else:  # English
                 recommendations.append(
-                    "🔧 If occurring in SQL queries, please appropriately configure REPARTITION hints or REPARTITION_BY_RANGE hints (when using Window functions)"
+                    "🔧 For memory efficiency improvement, please optimize JOIN order and review query structure"
                 )
         
         # Shuffle分析結果に追加
@@ -4627,7 +4580,7 @@ def analyze_bottlenecks_with_llm(metrics: Dict[str, Any]) -> str:
         high_priority_actions.append(f"**Resolve Memory Spill** - Eliminate {spill_gb:.2f}GB spill")
     
     if has_shuffle_bottleneck:
-        high_priority_actions.append("**Shuffle Optimization** - JOIN order and REPARTITION application")
+        high_priority_actions.append("**Shuffle Optimization** - JOIN order optimization")
     
     # MEDIUM actions
     if 20 <= photon_utilization < 80:
@@ -6000,24 +5953,7 @@ if final_sorted_nodes:
             if shuffle_attributes:
                 print(f"    🔄 Shuffle attributes: {', '.join(shuffle_attributes)}")
                 
-                # REPARTITIONヒントの提案（スピルが検出された場合のみ）
-                if spill_detected and spill_bytes > 0 and spill_display:
-                    # メモリ効率計算ロジックに統一
-                    peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
-                    if peak_memory_bytes > 0 and num_tasks > 0:
-                        memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
-                        target_partitions = int((memory_per_partition_mb / 512) * num_tasks)
-                        suggested_partitions = max(target_partitions, num_tasks * 2)
-                    else:
-                        # フォールバック：従来ロジック
-                        suggested_partitions = max(num_tasks * 2, 100)
-                    
-                    # Shuffle属性で検出されたカラムを全て使用（完全一致）
-                    repartition_columns = ", ".join(shuffle_attributes)
-                    
-                    print(f"    💡 Optimization suggestion: REPARTITION({suggested_partitions}, {repartition_columns})")
-                    print(f"       Reason: To improve spill ({spill_display})")
-                    print(f"       Target: Complete use of all {len(shuffle_attributes)} shuffle attribute columns")
+
             else:
                 print(f"    🔄 Shuffle attributes: Not configured")
         
@@ -8115,7 +8051,7 @@ Shuffle効率性スコア: {efficiency_rate:.1f}%
 🎯 Shuffle最適化推奨事項:
 - パーティション数の調整（目標: ≤{SHUFFLE_ANALYSIS_CONFIG.get('memory_per_partition_threshold_mb', 512)}MB/パーティション）
 - 高メモリ使用ノードのクラスター拡張検討
-- REPARTITIONヒント適用（スピル検出時のみ）
+
 - Liquid Clusteringによる根本的Shuffle削減"""
         else:
             enhanced_shuffle_summary += """
@@ -8169,23 +8105,7 @@ Shuffle効率性スコア: {efficiency_rate:.1f}%
         if node["skew_detected"]:
             performance_critical_issues.append(f"      ⚖️ スキュー: {node['skewed_partitions']}パーティション - データ分散改善必要")
     
-    # 🔄 REPARTITIONヒントの詳細生成（スピル検出時のみ）
-    repartition_hints = []
-    if detailed_bottleneck["shuffle_optimization_hints"]:
-        repartition_hints.append("🔄 REPARTITIONヒント（スピル検出時のみ）:")
-        for hint in detailed_bottleneck["shuffle_optimization_hints"]:
-            priority_icon = "🚨" if hint["priority"] == "HIGH" else "📈"
-            repartition_hints.append(f"   {priority_icon} ノードID {hint['node_id']}: {hint['suggested_sql']}")
-            repartition_hints.append(f"      属性: {', '.join(hint['attributes'])}")
-            repartition_hints.append(f"      理由: {hint['reason']}")
-            repartition_hints.append(f"      効果: {hint['estimated_improvement']}")
-            
-            # クエリへの適用方法の具体的な提案
-            main_attr = hint['attributes'][0]
-            if 'GROUP BY' in original_query.upper():
-                repartition_hints.append(f"      適用提案: GROUP BY前にREPARTITION({hint['suggested_sql'].split('(')[1]}")
-            elif 'JOIN' in original_query.upper():
-                repartition_hints.append(f"      適用提案: JOIN前のテーブルを{hint['suggested_sql']}でリパーティション")
+
     
     # 📊 処理速度重視の最適化推奨事項
     speed_optimization_recommendations = []
@@ -8260,8 +8180,6 @@ Shuffle効率性スコア: {efficiency_rate:.1f}%
 【📊 セル33詳細ボトルネック分析結果】
 {chr(10).join(performance_critical_issues) if performance_critical_issues else "特別な重要課題は設定なし"}
 
-【🔄 REPARTITIONヒント（スピル検出時のみ）】
-{chr(10).join(repartition_hints) if repartition_hints else "スピルが検出されていないため、REPARTITIONヒントは適用対象外です"}
 
 【🚀 処理速度重視の最適化推奨事項】
 {chr(10).join(speed_optimization_recommendations) if speed_optimization_recommendations else "特別な推奨事項はありません"}
@@ -8364,14 +8282,7 @@ Sparkの自動JOIN戦略を使用（エラー回避のためヒントは使用�
    - メモリ効率的なJOIN順序の検討
    - 中間結果のサイズ削減
 
-2. **🔄 REPARTITIONヒント適用**（🚨 **スピル検出時またはEnhanced Shuffle分析で最適化必要時** - 拡張条件）
-   - ✅ **スピルが検出された場合**: REPARTITIONヒントを適用（従来通り）
-   - ✅ **Enhanced Shuffle分析で最適化必要性=YESの場合**: REPARTITIONヒントを適用（新機能）
-   - ✅ **メモリ効率悪化時**: メモリ/パーティション > 512MB の場合もREPARTITIONヒントを適用
-   - ⚠️ **判定基準**: スピル検出 OR Enhanced Shuffle分析の最適化必要性=YES OR メモリ効率問題
-   - 検出されたShuffle attributesまたはEnhanced Shuffle分析結果を基に具体的なREPARTITIONヒントを適用
-
-3. **⚖️ データスキュー対策**
+2. **⚖️ データスキュー対策**
    - スキューパーティション（10個以上）検出時は分散改善を優先
    - 適切なパーティションキーの選択
    - データ分散の均等化
@@ -8411,7 +8322,7 @@ Sparkの自動JOIN戦略を使用（エラー回避のためヒントは使用�
 9. **🎯 JOIN順序とパーティショニングの最適化**（重要な構造的最適化）
    - **効率的なJOIN順序**: 小さいテーブルから大きいテーブルへの段階的結合
    - **Sparkの自動JOIN戦略**: エンジンの自動判定に委ねることでエラー回避
-   - **結合後のREPARTITION**: 結合後にGROUP BYの効率化のためREPARTITIONヒントを適用
+
    - **CTE構造の活用**: 必要に応じてCTEを使って段階的に処理する構造で出力
    - **スピル回避と並列度**: スピルを回避しつつ、並列度の高い処理ができるよう最適化
    
@@ -8426,7 +8337,7 @@ Sparkの自動JOIN戦略を使用（エラー回避のためヒントは使用�
        JOIN large_table ON small_table.key = large_table.key
    ),
    repartitioned_for_groupby AS (
-     SELECT /*+ REPARTITION(200, group_key) */
+     SELECT
        columns...
      FROM efficient_joined
    )
@@ -8438,132 +8349,12 @@ Sparkの自動JOIN戦略を使用（エラー回避のためヒントは使用�
    GROUP BY group_key
    ```
 
-【🔄 REPARTITIONヒント適用ルール - 構文エラー防止】
-REPARTITIONヒントを付与する場合は以下の最適化ルールを守ってください：
-
-🚨 **REPARTITIONヒント適用の新しいルール**: 
-- **✅ スピル検出時**: REPARTITIONヒントを適用（従来通り）
-- **✅ メモリ効率悪化時**: メモリ/パーティション > 512MB の場合もREPARTITIONヒントを適用（新機能）
-- **⚠️ 適用条件**: Enhanced Shuffle分析で最適化が必要と判定された場合も対象
-- **📊 判定基準**: スピル検出 OR メモリ効率問題（512MB/パーティション超過）
-
-技術詳細:
-- **REPARTITIONヒントは SELECT /*+ REPARTITION(パーティション数, カラム名) の形式で指定**
-- **REPARTITIONヒントの適用位置は、対象となるJOINやGROUP BYを含むSELECTの直前であるため、出力されたoutput_explain_plan_*.txtのPhysical Planから実行計画を理解し、適切な位置にREPARTITION ヒントを付与すること**
-
-**🚨 REPARTITIONヒント配置の重要な構文ルール:**
-1. **JOINやGROUP BYの処理段階で効果を発揮するため、必ずサブクエリ内部に配置する**
-2. **トップレベルのSELECT文に配置すると最終出力段階のみに影響し、JOIN/GROUP BY処理段階には影響しない**
-3. **複数のREPARTITIONヒントは各サブクエリ内部に個別に配置する**
-4. **パーティション数とカラム名は必須パラメータとして指定する**
-
-🚨 **REPARTITIONヒント適用の厳格なルール**：
-- **✅ スピル検出時**: GROUP BY前にREPARTITION(推奨数, group_by_column)
-- **✅ スピル検出時**: JOIN前にREPARTITION(推奨数, join_key)
-- **✅ メモリ効率悪化時**: メモリ/パーティション > 512MB の場合もREPARTITION適用
-- **📊 新判定基準**: Enhanced Shuffle分析で最適化必要性=YES の場合も適用対象
-- **⚠️ パーティション数計算**: メモリ効率改善時は目標512MB/パーティションで計算
-
-**🚨 CREATE TABLE AS SELECT (CTAS) でのREPARTITION配置の重要な注意事項:**
-- CREATE TABLE AS SELECT文では、トップレベルのSELECT句にREPARTITIONヒントを配置すると、**最終的な出力書き込み段階のみに影響**し、JOIN や集計などの中間処理段階には影響しない
-- JOINの前にパーティショニングを制御するには、**REPARTITIONヒントをサブクエリ内部に配置する必要がある**
-- これにより、Sparkがデータフローの適切な時点でリパーティションを適用し、書き込み段階ではなく実行段階で最適化される
-
-**正しいCTAS REPARTITIONヒント配置例:**
-```sql
--- ❌ 間違い: トップレベルのSELECT句（書き込み段階のみに影響）
-CREATE TABLE optimized_table AS
-SELECT /*+ REPARTITION(200, join_key) */
-  t1.column1, t2.column2
-FROM table1 t1
-  JOIN table2 t2 ON t1.join_key = t2.join_key
-
--- ✅ 正しい: サブクエリ内部に配置（JOIN処理段階で最適化）
-CREATE TABLE optimized_table AS
-SELECT 
-  t1.column1, t2.column2
-FROM (
-  SELECT /*+ REPARTITION(200, join_key) */
-    column1, join_key
-  FROM table1
-) t1
-  JOIN table2 t2 ON t1.join_key = t2.join_key
-```
-
-**🚨 全般的なREPARTITIONヒント配置の重要な注意事項:**
-- **CTAS以外のクエリでも同様**：トップレベルのクエリにREPARTITIONヒントを配置すると、**最終的な出力段階のみに影響**し、JOIN や集計などの中間変換段階には影響しない
-- この動作は、結果をテーブルに書き込むかどうかに関係なく**すべてのSpark SQLクエリで一貫**している
-- JOINの入力段階でリパーティションを確実に実行するには、**REPARTITIONヒントをサブクエリ内部に配置する必要がある**
-- これにより、Sparkが適切なデータフローの時点でリパーティションを適用し、最終出力段階ではなく実行段階で最適化される
-
-**一般的なクエリでの正しいREPARTITIONヒント配置例:**
-```sql
--- ❌ 間違い: トップレベルのSELECT句（最終出力段階のみに影響）
-SELECT /*+ REPARTITION(200, join_key) */
-  t1.column1, t2.column2
-FROM table1 t1
-  JOIN table2 t2 ON t1.join_key = t2.join_key
-
--- ✅ 正しい: サブクエリ内部に配置（JOIN処理段階で最適化）
-SELECT 
-  t1.column1, t2.column2
-FROM (
-  SELECT /*+ REPARTITION(200, join_key) */
-    column1, join_key
-  FROM table1
-) t1
-  JOIN table2 t2 ON t1.join_key = t2.join_key
-
--- ✅ 正しい: より複雑なケース（複数のサブクエリでのリパーティション）
-SELECT 
-  t1.column1, t2.column2, t3.column3
-FROM (
-  SELECT /*+ REPARTITION(200, join_key) */
-    column1, join_key
-  FROM table1
-) t1
-  JOIN (
-    SELECT /*+ REPARTITION(200, join_key) */
-      column2, join_key
-    FROM table2
-  ) t2 ON t1.join_key = t2.join_key
-  JOIN table3 t3 ON t2.join_key = t3.join_key
-```
-
-**🚨 全般的なREPARTITIONヒント配置の重要な注意事項:**
-- **CTAS以外のクエリでも同様**：トップレベルのクエリにREPARTITIONヒントを配置すると、**最終的な出力段階のみに影響**し、JOIN や集計などの中間変換段階には影響しない
-- この動作は、結果をテーブルに書き込むかどうかに関係なく**すべてのSpark SQLクエリで一貫**している
-- JOINの入力段階でリパーティションを確実に実行するには、**REPARTITIONヒントをサブクエリ内部に配置する必要がある**
-- これにより、Sparkが適切なデータフローの時点でリパーティションを適用し、最終出力段階ではなく実行段階で最適化される
-
-**一般的なクエリでの正しいREPARTITIONヒント配置例:**
-```sql
--- ❌ 間違い: トップレベルのSELECT句（最終出力段階のみに影響）
-SELECT /*+ REPARTITION(200, join_key) */
-  t1.column1, t2.column2
-FROM table1 t1
-  JOIN table2 t2 ON t1.join_key = t2.join_key
-
--- ✅ 正しい: サブクエリ内部に配置（JOIN処理段階で最適化）
-SELECT 
-  t1.column1, t2.column2
-FROM (
-  SELECT /*+ REPARTITION(200, join_key) */
-    column1, join_key
-  FROM table1
-) t1
-  JOIN table2 t2 ON t1.join_key = t2.join_key
-```
-
-
-
 【重要な制約】
 - 絶対に不完全なクエリを生成しないでください
 - すべてのカラム名、テーブル名、CTE名を完全に記述してください
 - プレースホルダー（...、[省略]、空白など）は一切使用しないでください
 - オリジナルクエリのすべてのSELECT項目を保持してください
 - **🚨 DISTINCT句の絶対保持**: 元のクエリにDISTINCT句がある場合は、**必ずDISTINCT句を保持**してください
-- **最適化時のDISTINCT保持**: REPARTITIONヒントを追加する際も、DISTINCT句は絶対に削除しないでください
 - 元のクエリが長い場合でも、すべてのカラムを省略せずに記述してください
 - 実際に実行できる完全なSQLクエリのみを出力してください
 - 元のクエリと同じアウトプットになることを厳守してください
@@ -8571,35 +8362,15 @@ FROM (
 【🚨 最適化における構文エラー防止】
 **絶対に守るべき文法ルール（構文エラー防止のため必須）:**
 
-✅ **REPARTITIONヒントの正しい配置:**
-```sql
--- REPARTITIONヒントはメインクエリのSELECT直後に配置
-SELECT /*+ REPARTITION(200, column_name) */
-  column1, column2, ...
-FROM table1 t1
-  JOIN table2 t2 ON t1.id = t2.id
-```
-
-✅ **DISTINCT句との正しい組み合わせ（絶対必須）:**
-```sql
--- 🚨 重要: DISTINCT句は必ずヒント句の後に配置
-SELECT /*+ REPARTITION(200, column_name) */ DISTINCT
-  cs.ID, cs.column1, cs.column2, ...
-FROM table1 cs
-  JOIN table2 t2 ON cs.id = t2.id
-```
-
 **🚨 構文エラー防止のための基本ルール:**
 1. **ヒントは必ずメインクエリのSELECT文の直後に配置**
 2. **FROM句、JOIN句、WHERE句内には絶対に配置しない**
-3. **REPARTITIONヒントには適切なパーティション数とカラム名を指定**
 
 【出力形式】
 ## 🚀 処理速度重視の最適化されたSQL
 
 **🎯 実際に適用した最適化手法** (実施していない手法は記載禁止):
 - [具体的に実装された最適化手法のみをリスト]
-- ❌ スピル未検出の場合: REPARTITIONヒント適用は記載しない
 - ❌ 実際に変更していない要素: 「最適化」として記載しない
 - ✅ 実際の変更内容のみ: JOIN順序変更、CTE構造化、フィルタ改善等
 
@@ -8610,12 +8381,8 @@ FROM table1 cs
 - ⚠️ 数値は最適化プロセス中のコスト比較結果に基づく
 
 **🚨 構文エラー防止の最終確認**:
-- ✅ REPARTITIONヒントは適切にメインクエリのSELECT直後に配置されている
 - ✅ FROM句、JOIN句、WHERE句内にヒントが配置されていない
-- ✅ REPARTITIONヒントには適切なパーティション数とカラム名が指定されている
 - ✅ **DISTINCT句が元のクエリにある場合は必ず保持されている**
-- ✅ **ヒント句追加時にDISTINCT句が削除されていない**
-- ✅ **DISTINCT句がヒント句の直後に正しく配置されている**
 - ✅ プレースホルダー（...、[省略]等）が一切使用されていない
 - ✅ 完全なSQL構文になっている（不完全なクエリではない）
 - ✅ NULLリテラルが適切な型でキャストされている
@@ -8625,10 +8392,6 @@ FROM table1 cs
 - ✅ **Sparkの自動JOIN戦略に委ねてヒント不使用で最適化されている**
 
 ```sql
--- 🚨 重要: REPARTITIONヒントはメインクエリのSELECT文の直後に配置
--- 例: SELECT /*+ REPARTITION(200, column_name) */ column1, column2, ...
--- 🚨 DISTINCT句保持例: SELECT /*+ REPARTITION(200, column_name) */ DISTINCT cs.ID, cs.column1, ...
--- 🚨 REPARTITIONヒントの適切な配置: SELECT /*+ REPARTITION(200, join_key) */ column1, column2, ...
 -- ❌ 禁止: BROADCASTヒント（/*+ BROADCAST */、/*+ BROADCAST(table) */）は一切使用禁止
 -- ✅ 推奨: Sparkの自動JOIN戦略に委ねてヒント不使用で最適化
 [完全なSQL - すべてのカラム・CTE・テーブル名を省略なしで記述]
@@ -8999,24 +8762,7 @@ def generate_top10_time_consuming_processes_report(extracted_metrics: Dict[str, 
                 if shuffle_attributes:
                     report_lines.append(f"    🔄 Shuffle属性: {', '.join(shuffle_attributes)}")
                     
-                    # REPARTITIONヒントの提案（スピルが検出された場合のみ）
-                    if spill_detected and spill_bytes > 0 and spill_display:
-                        # メモリ効率計算ロジックに統一
-                        peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
-                        if peak_memory_bytes > 0 and num_tasks > 0:
-                            memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
-                            target_partitions = int((memory_per_partition_mb / 512) * num_tasks)
-                            suggested_partitions = max(target_partitions, num_tasks * 2)
-                        else:
-                            # フォールバック：従来ロジック
-                            suggested_partitions = max(num_tasks * 2, 100)
-                        
-                        # Shuffle属性で検出されたカラムを全て使用（完全一致）
-                        repartition_columns = ", ".join(shuffle_attributes)
-                        
-                        report_lines.append(f"    💡 最適化提案: REPARTITION({suggested_partitions}, {repartition_columns})")
-                        report_lines.append(f"       理由: スピル({spill_display})を改善するため")
-                        report_lines.append(f"       対象: Shuffle属性全{len(shuffle_attributes)}カラムを完全使用")
+
                 else:
                     report_lines.append(f"    🔄 Shuffle属性: 設定なし")
             
@@ -11819,7 +11565,7 @@ def remove_sql_placeholders(sql_query: str) -> str:
         r'-- 例:.*',
         r'-- 複数ヒント例.*',
         r'-- 無効な例:.*',
-        r'-- 🚨 REPARTITIONヒント.*',
+
     ]
     
     for pattern in instruction_comments:
@@ -12624,14 +12370,14 @@ def generate_optimized_query_with_error_feedback(original_query: str, analysis_r
 ```
 
 **⚠️ 重要**: 上記の最適化クエリに含まれる以下の要素は必ず保持してください：
-- **REPARTITIONヒント**: `/*+ REPARTITION(数値, カラム名) */`
+
 - **その他の最適化ヒント**: COALESCE、CACHE等
 - **最適化手法**: CTE構造、結合順序、フィルタープッシュダウン等
 - **パフォーマンス改善策**: スピル対策、並列度改善等
 
 **🎯 エラー修正の方針**: 
 - エラー箇所のみを修正し、最適化要素は全て保持
-- ヒント句の配置ルールは厳守（REPARTITIONはメインクエリSELECT直後等）
+- ヒント句の配置ルールは厳守（メインクエリSELECT直後等）
 """
 
     # 🚨 NEW: エラーメッセージ解析による詳細修正指示生成
@@ -12695,7 +12441,7 @@ def generate_optimized_query_with_error_feedback(original_query: str, analysis_r
 【🔧 エラー修正の重要な指針】
 1. **🚀 最適化要素の絶対保持（最重要）**:
    - **初回生成されたJOIN順序最適化を必ず保持**
-   - **初回生成されたREPARTITIONヒントを必ず保持**: `/*+ REPARTITION(数値, カラム) */`
+
    - **その他の最適化ヒントも全て保持**: COALESCE、CACHE等
    - **CTE構造や結合順序などの最適化設計を維持**
    - **スピル対策やパフォーマンス改善策を保持**
@@ -12791,9 +12537,7 @@ FROM store_sales ss
 - **削除したBROADCAST対象をメインSELECT直後に移動**
 - **複数のBROADCAST対象はカンマ区切りで統合: `/*+ BROADCAST(table1, table2, table3) */`**
 
-【🚨 REPARTITIONヒント配置の厳格なルール - エラー修正版】
-- **サブクエリ内部のSELECT文直後に配置**
-- **パーティション数とカラム名は必須**: `/*+ REPARTITION(200, column_name) */`
+
 - **スピル検出時のみ適用**
 
 【重要な制約 - エラー修正版】
@@ -12810,7 +12554,7 @@ FROM store_sales ss
 - [具体的なエラー修正箇所]
 
 **保持した最適化要素**:
-- [保持されたREPARTITIONヒント]
+
 - [保持されたJOIN順序最適化]
 - [保持されたその他の最適化手法]
 
@@ -14541,7 +14285,7 @@ def analyze_degradation_causes(performance_comparison: Dict[str, Any], original_
                 degradation_analysis['fix_instructions'].extend([
                     "小テーブルを効率的にJOINで処理してください",
                                          "大きなテーブルのJOIN順序を最適化してください",
-                    "REPARTITIONヒントの配置位置を見直してください"
+
                 ])
             
             # Memory usage degradation

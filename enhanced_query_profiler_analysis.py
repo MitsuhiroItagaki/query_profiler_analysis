@@ -252,15 +252,15 @@ def analyze_shuffle_operations(node_metrics: List[Dict[str, Any]], output_langua
                     "Consider using broadcast JOIN or pre-aggregation"
                 )
         
-        # SQLクエリでのREPARTITIONヒントに関する推奨事項
+        # スピル対策に関する推奨事項
         if not is_memory_efficient:
             if output_language == 'ja':
                 recommendations.append(
-                    "🔧 SQLクエリで発生している場合はREPARTITONヒントもしくはREPARTITON_BY_RANGEヒント(Window関数使用時)を適切に設定してください"
+                    "🔧 メモリ効率改善のため、JOIN順序の最適化やクエリ構造の見直しを行ってください"
                 )
             else:  # English
                 recommendations.append(
-                    "🔧 If occurring in SQL queries, please appropriately configure REPARTITION hints or REPARTITION_BY_RANGE hints (when using Window functions)"
+                    "🔧 For memory efficiency improvement, please optimize JOIN order and review query structure"
                 )
         
         # Shuffle分析結果に追加
