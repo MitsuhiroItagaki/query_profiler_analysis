@@ -1843,16 +1843,12 @@ def extract_detailed_bottleneck_analysis(extracted_metrics: Dict[str, Any]) -> D
         if should_add_repartition_hint:
             shuffle_attributes = extract_shuffle_attributes(node)
             if shuffle_attributes:
-                # パーティション数の計算ロジックを改善
-                if "Memory efficiency improvement" in repartition_reason:
-                    # メモリ効率改善の場合: 目標512MB/パーティションに基づいて計算
-                    peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
-                    memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
-                    target_partitions = int((memory_per_partition_mb / 512) * num_tasks)
-                    suggested_partitions = max(target_partitions, 200, num_tasks * 2)
-                else:
-                    # スピル改善の場合: 従来のロジック
-                    suggested_partitions = max(num_tasks * 2, 200)
+                # パーティション数の計算ロジック（メモリ効率悪化時統一）
+                # すべてのケースで目標512MB/パーティションに基づいて計算
+                peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
+                memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
+                target_partitions = int((memory_per_partition_mb / 512) * num_tasks)
+                suggested_partitions = max(target_partitions, num_tasks * 2)
                 
                 # Shuffle属性で検出されたカラムを全て使用（完全一致）
                 repartition_columns = ", ".join(shuffle_attributes)
@@ -5474,7 +5470,15 @@ if final_sorted_nodes:
                 
                 # REPARTITIONヒントの提案（スピルが検出された場合のみ）
                 if spill_detected and spill_bytes > 0 and spill_display:
-                    suggested_partitions = max(num_tasks * 2, 200)  # 最小200パーティション
+                    # メモリ効率計算ロジックに統一
+                    peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
+                    if peak_memory_bytes > 0 and num_tasks > 0:
+                        memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
+                        target_partitions = int((memory_per_partition_mb / 512) * num_tasks)
+                        suggested_partitions = max(target_partitions, num_tasks * 2)
+                    else:
+                        # フォールバック：従来ロジック
+                        suggested_partitions = max(num_tasks * 2, 100)
                     
                     # Shuffle属性で検出されたカラムを全て使用（完全一致）
                     repartition_columns = ", ".join(shuffle_attributes)
@@ -8463,7 +8467,15 @@ def generate_top10_time_consuming_processes_report(extracted_metrics: Dict[str, 
                     
                     # REPARTITIONヒントの提案（スピルが検出された場合のみ）
                     if spill_detected and spill_bytes > 0 and spill_display:
-                        suggested_partitions = max(num_tasks * 2, 200)  # 最小200パーティション
+                        # メモリ効率計算ロジックに統一
+                        peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
+                        if peak_memory_bytes > 0 and num_tasks > 0:
+                            memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
+                            target_partitions = int((memory_per_partition_mb / 512) * num_tasks)
+                            suggested_partitions = max(target_partitions, num_tasks * 2)
+                        else:
+                            # フォールバック：従来ロジック
+                            suggested_partitions = max(num_tasks * 2, 100)
                         
                         # Shuffle属性で検出されたカラムを全て使用（完全一致）
                         repartition_columns = ", ".join(shuffle_attributes)
