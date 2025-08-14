@@ -17337,7 +17337,7 @@ except Exception as _e:
 print("🎉 All processing completed!")
 print("📁 Please check the generated files and utilize the analysis results.")
 
-# 🧹 Cleanup: Remove liquid_clustering_analysis_*.md and output_liquid_clustering_guidelines_*.md in non-debug mode
+# 🧹 Cleanup: Remove liquid_clustering_analysis_*.md, output_liquid_clustering_guidelines_*.md, and output_enhanced_shuffle_analysis_*.md in non-debug mode
 try:
     _debug_enabled_cleanup = str(globals().get('DEBUG_ENABLED', 'N')).upper()
     if _debug_enabled_cleanup != 'Y':
@@ -17348,12 +17348,14 @@ try:
             "/workspace/liquid_clustering_analysis_*.md",
             "output_liquid_clustering_guidelines_*.md",
             "/workspace/output_liquid_clustering_guidelines_*.md",
+            "output_enhanced_shuffle_analysis_*.md",
+            "/workspace/output_enhanced_shuffle_analysis_*.md",
         ):
             for _md in glob.glob(_pattern):
                 try:
                     os.remove(_md)
-                    print(f"🧹 Deleted liquid clustering markdown (non-debug mode): {_md}")
+                    print(f"🧹 Deleted markdown file (non-debug mode): {_md}")
                 except Exception as _e:
                     print(f"⚠️ Failed to delete {_md}: {_e}")
 except Exception as _e:
-    print(f"⚠️ Cleanup step for liquid clustering markdown encountered an error: {str(_e)}")
+    print(f"⚠️ Cleanup step for markdown files encountered an error: {str(_e)}")
