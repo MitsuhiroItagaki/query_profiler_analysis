@@ -1832,6 +1832,7 @@ def extract_detailed_bottleneck_analysis(extracted_metrics: Dict[str, Any]) -> D
             # この時点ではまだenhanced_shuffle_analysisは実行されていないため、
             # メモリ効率の基準（512MB/パーティション）を直接チェック
             elif num_tasks > 0:
+                peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
                 memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
                 threshold_mb = 512  # SHUFFLE_ANALYSIS_CONFIG["memory_per_partition_threshold_mb"]
                 
@@ -1845,6 +1846,7 @@ def extract_detailed_bottleneck_analysis(extracted_metrics: Dict[str, Any]) -> D
                 # パーティション数の計算ロジックを改善
                 if "Memory efficiency improvement" in repartition_reason:
                     # メモリ効率改善の場合: 目標512MB/パーティションに基づいて計算
+                    peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
                     memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
                     target_partitions = int((memory_per_partition_mb / 512) * num_tasks)
                     suggested_partitions = max(target_partitions, 200, num_tasks * 2)
