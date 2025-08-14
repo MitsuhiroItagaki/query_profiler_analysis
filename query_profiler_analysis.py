@@ -8360,11 +8360,12 @@ Sparkの自動JOIN戦略を使用（エラー回避のためヒントは使用�
    - メモリ効率的なJOIN順序の検討
    - 中間結果のサイズ削減
 
-2. **🔄 REPARTITIONヒント適用**（🚨 **スピル検出時の場合のみ** - 重要な条件）
-   - ❌ **スピルが検出されていない場合**: REPARTITIONヒントは一切適用しない
-   - ✅ **スピルが検出された場合のみ**: REPARTITIONヒントを適用
-   - ⚠️ **記載ルール**: スピル未検出の場合は「REPARTITIONの適用」を一切記載しない
-   - 検出されたShuffle attributesを基に具体的なREPARTITIONヒントを適用（スピル検出時のみ）
+2. **🔄 REPARTITIONヒント適用**（🚨 **スピル検出時またはEnhanced Shuffle分析で最適化必要時** - 拡張条件）
+   - ✅ **スピルが検出された場合**: REPARTITIONヒントを適用（従来通り）
+   - ✅ **Enhanced Shuffle分析で最適化必要性=YESの場合**: REPARTITIONヒントを適用（新機能）
+   - ✅ **メモリ効率悪化時**: メモリ/パーティション > 512MB の場合もREPARTITIONヒントを適用
+   - ⚠️ **判定基準**: スピル検出 OR Enhanced Shuffle分析の最適化必要性=YES OR メモリ効率問題
+   - 検出されたShuffle attributesまたはEnhanced Shuffle分析結果を基に具体的なREPARTITIONヒントを適用
 
 3. **⚖️ データスキュー対策**
    - スキューパーティション（10個以上）検出時は分散改善を優先
