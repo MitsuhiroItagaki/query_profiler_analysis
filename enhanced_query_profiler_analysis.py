@@ -214,6 +214,12 @@ def analyze_shuffle_operations(node_metrics: List[Dict[str, Any]]) -> Dict[str, 
                 "ブロードキャストJOINや事前集約の活用を検討"
             )
         
+        # SQLクエリでのREPARTITIONヒントに関する推奨事項
+        if not is_memory_efficient:
+            recommendations.append(
+                "🔧 SQLクエリで発生している場合はREPARTITONヒントもしくはREPARTITON_BY_RANGEヒント(Window関数使用時)を適切に設定してください"
+            )
+        
         # Shuffle分析結果に追加
         shuffle_node_analysis = {
             "node_id": node_id,
