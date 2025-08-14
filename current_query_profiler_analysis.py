@@ -1833,8 +1833,9 @@ def extract_detailed_bottleneck_analysis(extracted_metrics: Dict[str, Any], enha
             # Enhanced Shuffle分析結果から該当ノードを検索
             shuffle_nodes = enhanced_shuffle_analysis.get('shuffle_nodes', [])
             matching_shuffle_node = None
+            node_id = node_analysis["node_id"]  # Fix: Define node_id from node_analysis
             for shuffle_node in shuffle_nodes:
-                if str(shuffle_node.get('node_id')) == node_id:
+                if str(shuffle_node.get('node_id')) == str(node_id):
                     matching_shuffle_node = shuffle_node
                     break
             
