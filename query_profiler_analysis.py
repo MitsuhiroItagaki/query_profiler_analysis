@@ -3988,13 +3988,37 @@ def analyze_bottlenecks_with_llm(metrics: Dict[str, Any]) -> str:
                 report_lines.append(f"  {i}. `{expression}`")
             report_lines.append("")
     
-    # 付記: キー選定ガイドライン（常に表示）
+    # テーブル最適化推奨セクション
     report_lines.append("## 📋 テーブル最適化推奨")
     report_lines.append("")
-    report_lines.append("### 📋 Liquid Clustering キー選定ガイドライン")
-    report_lines.append("")
-    report_lines.append(get_liquid_clustering_guidelines())
-    report_lines.append("")
+    
+    # テーブル分析がある場合のみ、catalog_salesテーブル分析として表示
+    if identified_tables:
+        # 最初のテーブル（通常catalog_sales）に対する分析
+        main_table = identified_tables[0] if identified_tables else "catalog_sales"
+        report_lines.append(f"├── {main_table} テーブル分析")
+        report_lines.append("│   ├── テーブルサイズ・クラスタリングキー情報")
+        report_lines.append("│   ├── 選定根拠")
+        report_lines.append("│   ├── 実装SQL")
+        report_lines.append("│   └── 期待される改善効果")
+        report_lines.append("│")
+        report_lines.append("└── 💡 Liquid Clustering キー選定ガイドライン")
+        report_lines.append("    ├── キー選定の原則")
+        report_lines.append("    ├── GROUP BY キーの考慮条件")
+        report_lines.append("    └── 実務上の推奨")
+        report_lines.append("")
+        
+        # ガイドラインをサブ項目として配置
+        report_lines.append("### 💡 Liquid Clustering キー選定ガイドライン")
+        report_lines.append("")
+        report_lines.append(get_liquid_clustering_guidelines())
+        report_lines.append("")
+    else:
+        # テーブル分析がない場合は従来通り
+        report_lines.append("### 📋 Liquid Clustering キー選定ガイドライン")
+        report_lines.append("")
+        report_lines.append(get_liquid_clustering_guidelines())
+        report_lines.append("")
     
     # 実装SQL例
     if identified_tables:
@@ -10382,7 +10406,19 @@ Please check:
         _guidelines_text = get_liquid_clustering_guidelines()
         if ("### 📋 Liquid Clustering キー選定ガイドライン" not in report) and ("### 📋 Liquid Clustering Key Selection Guidelines" not in report) and ("### 💡 Liquid Clustering キー選定ガイドライン" not in report) and ("### 💡 Liquid Clustering Key Selection Guidelines" not in report) and ("### 📘 Liquid Clustering キー選定ガイドライン" not in report) and ("### 📘 Liquid Clustering Key Selection Guidelines" not in report):
             if OUTPUT_LANGUAGE == 'ja':
-                report += "\n## 📋 テーブル最適化推奨\n\n### 📋 Liquid Clustering キー選定ガイドライン\n\n" + _guidelines_text + "\n"
+                # ツリー構造でガイドラインをサブ項目として配置
+                report += "\n## 📋 テーブル最適化推奨\n"
+                report += "├── catalog_sales テーブル分析\n"
+                report += "│   ├── テーブルサイズ・クラスタリングキー情報\n"
+                report += "│   ├── 選定根拠\n"
+                report += "│   ├── 実装SQL\n"
+                report += "│   └── 期待される改善効果\n"
+                report += "│\n"
+                report += "└── 💡 Liquid Clustering キー選定ガイドライン    ← ★ サブ項目として配置\n"
+                report += "    ├── キー選定の原則\n"
+                report += "    ├── GROUP BY キーの考慮条件\n"
+                report += "    └── 実務上の推奨\n\n"
+                report += "### 💡 Liquid Clustering キー選定ガイドライン\n\n" + _guidelines_text + "\n"
             else:
                 report += "\n## 📋 Table Optimization Recommendations\n\n### 💡 Liquid Clustering Key Selection Guidelines\n\n" + _guidelines_text + "\n"
     except Exception:
@@ -10425,7 +10461,17 @@ def refine_report_with_llm(raw_report: str, query_id: str) -> str:
 【見出しの骨子（出力に例文を含めないこと）]
 - # 📊 SQL最適化レポート
 - ## 🎯 1. ボトルネック分析結果（AI分析、主要指標、ボトルネック）
-- ## 📋 推奨テーブル分析
+- ## 📋 テーブル最適化推奨
+  ├── catalog_sales テーブル分析
+  │   ├── テーブルサイズ・クラスタリングキー情報
+  │   ├── 選定根拠
+  │   ├── 実装SQL
+  │   └── 期待される改善効果
+  │
+  └── 💡 Liquid Clustering キー選定ガイドライン    ← ★ サブ項目として配置
+      ├── キー選定の原則
+      ├── GROUP BY キーの考慮条件
+      └── 実務上の推奨
 - ## 🚀 4. SQL最適化分析結果（最適化プロセス詳細、最適化提案、パフォーマンス検証、期待効果）
 - ## 🔍 6. EXPLAIN + EXPLAIN COST統合分析結果（必要時）
 
@@ -11286,7 +11332,19 @@ def save_optimized_sql_files(original_query: str, optimized_result: str, metrics
         _gl_text = get_liquid_clustering_guidelines()
         if ("### 📋 Liquid Clustering キー選定ガイドライン" not in refined_report) and ("### 📋 Liquid Clustering Key Selection Guidelines" not in refined_report) and ("### 💡 Liquid Clustering キー選定ガイドライン" not in refined_report) and ("### 💡 Liquid Clustering Key Selection Guidelines" not in refined_report) and ("### 📘 Liquid Clustering キー選定ガイドライン" not in refined_report) and ("### 📘 Liquid Clustering Key Selection Guidelines" not in refined_report):
             if OUTPUT_LANGUAGE == 'ja':
-                refined_report += "\n## 📋 テーブル最適化推奨\n\n### 📋 Liquid Clustering キー選定ガイドライン\n\n" + _gl_text + "\n"
+                # ツリー構造でガイドラインをサブ項目として配置
+                refined_report += "\n## 📋 テーブル最適化推奨\n"
+                refined_report += "├── catalog_sales テーブル分析\n"
+                refined_report += "│   ├── テーブルサイズ・クラスタリングキー情報\n"
+                refined_report += "│   ├── 選定根拠\n"
+                refined_report += "│   ├── 実装SQL\n"
+                refined_report += "│   └── 期待される改善効果\n"
+                refined_report += "│\n"
+                refined_report += "└── 💡 Liquid Clustering キー選定ガイドライン    ← ★ サブ項目として配置\n"
+                refined_report += "    ├── キー選定の原則\n"
+                refined_report += "    ├── GROUP BY キーの考慮条件\n"
+                refined_report += "    └── 実務上の推奨\n\n"
+                refined_report += "### 💡 Liquid Clustering キー選定ガイドライン\n\n" + _gl_text + "\n"
             else:
                 refined_report += "\n## 📋 Table Optimization Recommendations\n\n### 💡 Liquid Clustering Key Selection Guidelines\n\n" + _gl_text + "\n"
     except Exception:
