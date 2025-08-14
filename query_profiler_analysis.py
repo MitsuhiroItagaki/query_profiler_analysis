@@ -10564,6 +10564,7 @@ def refine_report_with_llm(raw_report: str, query_id: str) -> str:
 【見出しの骨子（出力に例文を含めないこと）]
 - # 📊 SQL最適化レポート
 - ## 🎯 1. ボトルネック分析結果（AI分析、主要指標、ボトルネック）
+- ## 🐌 2. 最も時間がかかっている処理TOP10（詳細なボトルネック分析、処理時間分析）
 - ## 📋 テーブル最適化推奨
   ├── catalog_sales テーブル分析
   │   ├── 基本情報（テーブルサイズ・クラスタリングキー情報）
@@ -10601,6 +10602,7 @@ As a technical document editor, refine the Databricks SQL performance analysis r
 [Heading Outline (do not include examples in output)]
 - # 📊 SQL Optimization Report
 - ## 🎯 1. Bottleneck Analysis Results (AI analysis, KPIs, bottlenecks)
+- ## 🐌 2. Top 10 Most Time-Consuming Processes (detailed bottleneck analysis, processing time analysis)
 - ## 📋 Recommended Table Analysis
 - ## 🚀 4. SQL Optimization Results (process details, proposals, performance verification, expected effects)
 - ## 🔍 6. EXPLAIN + EXPLAIN COST Integrated Analysis (if applicable)
