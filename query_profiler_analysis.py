@@ -16581,6 +16581,83 @@ def find_latest_report_file() -> str:
     # 最新のファイルを取得（タイムスタンプ順）
     latest_file = max(report_files, key=os.path.getctime)
     return latest_file
+
+def find_latest_shuffle_analysis_file() -> str:
+    """Find the latest enhanced shuffle analysis file"""
+    import os
+    import glob
+    
+    # 現在のディレクトリでShuffle分析ファイルを検索 (言語別対応)
+    language_suffix = 'en' if OUTPUT_LANGUAGE == 'en' else 'jp'
+    pattern = f"output_enhanced_shuffle_analysis_{language_suffix}_*.md"
+    shuffle_files = glob.glob(pattern)
+    
+    if not shuffle_files:
+        return None
+    
+    # 最新のファイルを取得（タイムスタンプ順）
+    latest_file = max(shuffle_files, key=os.path.getctime)
+    return latest_file
+
+def combine_reports_with_shuffle_analysis(main_report_content: str, shuffle_analysis_content: str) -> str:
+    """Combine main report with enhanced shuffle analysis content before table optimization section"""
+    import re
+    
+    # テーブル最適化推奨セクションの位置を探す
+    table_optimization_patterns = [
+        r'^## 📋 テーブル最適化推奨',
+        r'^### 📋 テーブル最適化推奨', 
+        r'^# 📋 テーブル最適化推奨',
+        r'## Table Optimization Recommendations',
+        r'### Table Optimization Recommendations',
+        r'# Table Optimization Recommendations'
+    ]
+    
+    table_section_match = None
+    for pattern in table_optimization_patterns:
+        table_section_match = re.search(pattern, main_report_content, re.MULTILINE)
+        if table_section_match:
+            break
+    
+    if table_section_match:
+        # テーブル最適化推奨セクションの前に Shuffle分析を挿入
+        insert_position = table_section_match.start()
+        
+        # Shuffle分析セクションのヘッダーを調整
+        if OUTPUT_LANGUAGE == 'ja':
+            shuffle_section_header = "\n## 🔧 Enhanced Shuffle操作最適化分析\n\n"
+        else:
+            shuffle_section_header = "\n## 🔧 Enhanced Shuffle Operations Optimization Analysis\n\n"
+        
+        # 元の装飾線を削除してシンプルに
+        clean_shuffle_content = re.sub(r'^={70,}.*?={70,}\n', '', shuffle_analysis_content, flags=re.MULTILINE | re.DOTALL)
+        clean_shuffle_content = re.sub(r'^={70,}.*?\n', '', clean_shuffle_content, flags=re.MULTILINE)
+        clean_shuffle_content = clean_shuffle_content.strip()
+        
+        # 統合レポートを作成
+        combined_content = (
+            main_report_content[:insert_position] +
+            shuffle_section_header +
+            clean_shuffle_content +
+            "\n\n" +
+            main_report_content[insert_position:]
+        )
+        
+        return combined_content
+    else:
+        # テーブル最適化推奨セクションが見つからない場合は末尾に追加
+        if OUTPUT_LANGUAGE == 'ja':
+            shuffle_section_header = "\n\n## 🔧 Enhanced Shuffle操作最適化分析\n\n"
+        else:
+            shuffle_section_header = "\n\n## 🔧 Enhanced Shuffle Operations Optimization Analysis\n\n"
+            
+        # 元の装飾線を削除してシンプルに
+        clean_shuffle_content = re.sub(r'^={70,}.*?={70,}\n', '', shuffle_analysis_content, flags=re.MULTILINE | re.DOTALL)
+        clean_shuffle_content = re.sub(r'^={70,}.*?\n', '', clean_shuffle_content, flags=re.MULTILINE)
+        clean_shuffle_content = clean_shuffle_content.strip()
+        
+        combined_content = main_report_content + shuffle_section_header + clean_shuffle_content
+        return combined_content
 # 
 def refine_report_content_with_llm(report_content: str) -> str:
     """Refine report using LLM"""
@@ -16659,6 +16736,7 @@ def refine_report_content_with_llm(report_content: str) -> str:
 - **具体的な数値メトリクス**: 実行時間、データ読み込み量、スピル量、利用率等
 - **SQL実装例**: ALTER TABLE構文、CLUSTER BY文、ヒント句等の具体例
 - **テーブル別詳細情報**: 各テーブルのノード情報、フィルタ効率、推奨事項
+- **Enhanced Shuffle操作最適化分析**: Shuffle操作の詳細分析、メモリ使用量、パーティション数、効率性評価等の情報
 
 {photon_evaluation_instruction}
 
@@ -16674,6 +16752,7 @@ def refine_report_content_with_llm(report_content: str) -> str:
 - **必須**: パーセンテージ計算では元の正確な数値を使用
 - **必須**: テーブル別詳細分析情報（現在キー、推奨キー、フィルタ率）を削除しない
 - **必須**: SQL実装例（ALTER TABLE、CLUSTER BY等）を完全な形で保持
+- **必須**: Enhanced Shuffle操作最適化分析セクションの内容を完全に保持し、構造と数値データを維持
 """
     else:
         refinement_prompt = f"""You are a technical document editor. Please refine the following Databricks SQL performance analysis report to make it readable and concise.
@@ -16694,6 +16773,7 @@ def refine_report_content_with_llm(report_content: str) -> str:
 - **Specific numerical metrics**: Execution time, data read volume, spill volume, utilization rates, etc.
 - **SQL implementation examples**: Specific examples of ALTER TABLE syntax, CLUSTER BY statements, hint clauses, etc.
 - **Table-specific detailed information**: Node information, filter efficiency, and recommendations for each table
+- **Enhanced Shuffle Operations Optimization Analysis**: Detailed analysis of shuffle operations, memory usage, partition counts, efficiency evaluations, etc.
 
 {photon_evaluation_instruction}
 
@@ -16709,6 +16789,7 @@ def refine_report_content_with_llm(report_content: str) -> str:
 - **Required**: Use original accurate numerical values for percentage calculations
 - **Required**: Do not delete detailed analysis information by table (current key, recommended key, filter rate)
 - **Required**: Preserve SQL implementation examples (ALTER TABLE, CLUSTER BY, etc.) in complete form
+- **Required**: Completely preserve Enhanced Shuffle Operations Optimization Analysis section content, maintaining structure and numerical data
 """
     
     try:
@@ -16871,6 +16952,27 @@ try:
             original_content = f.read()
         
         print(f"📊 Original report size: {len(original_content):,} characters")
+        
+        # 🔧 Enhanced Shuffle分析ファイルの統合処理
+        shuffle_analysis_file = find_latest_shuffle_analysis_file()
+        if shuffle_analysis_file:
+            print(f"🔧 Found Enhanced Shuffle Analysis file: {shuffle_analysis_file}")
+            try:
+                with open(shuffle_analysis_file, 'r', encoding='utf-8') as f:
+                    shuffle_content = f.read()
+                
+                print(f"📊 Shuffle analysis size: {len(shuffle_content):,} characters")
+                
+                # Shuffle分析を主レポートに統合
+                original_content = combine_reports_with_shuffle_analysis(original_content, shuffle_content)
+                print(f"✅ Enhanced Shuffle Analysis integrated into main report")
+                print(f"📊 Combined report size: {len(original_content):,} characters")
+                
+            except Exception as e:
+                print(f"⚠️ Error reading shuffle analysis file: {str(e)}")
+                print("📋 Proceeding with main report only")
+        else:
+            print("ℹ️ No Enhanced Shuffle Analysis file found - proceeding with main report only")
         
         # 🚨 重複推敲防止: 既に推敲済みかチェック
         refinement_indicators = [
