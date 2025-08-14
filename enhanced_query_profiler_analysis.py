@@ -7,6 +7,7 @@ This tool analyzes Databricks SQL profiler JSON files and provides:
 2. Enhanced Shuffle operation validation
 3. Memory efficiency per partition analysis  
 4. Optimization recommendations based on memory/partition ratio
+5. Query optimization with REPARTITION hints
 
 Key Enhancement: Validates that peak memory per partition is ≤ 512MB
 """
@@ -36,7 +37,11 @@ SHUFFLE_ANALYSIS_CONFIG = {
     # Optimization recommendations
     "enable_liquid_clustering_advice": True,
     "enable_partition_tuning_advice": True,
-    "enable_cluster_sizing_advice": True
+    "enable_cluster_sizing_advice": True,
+    
+    # Query optimization settings
+    "enable_query_optimization": True,
+    "enable_repartition_hints": True
 }
 
 def analyze_shuffle_operations(node_metrics: List[Dict[str, Any]], output_language: str = 'ja') -> Dict[str, Any]:
