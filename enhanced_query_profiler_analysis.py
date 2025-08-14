@@ -39,7 +39,7 @@ SHUFFLE_ANALYSIS_CONFIG = {
     "enable_cluster_sizing_advice": True
 }
 
-def analyze_shuffle_operations(node_metrics: List[Dict[str, Any]]) -> Dict[str, Any]:
+def analyze_shuffle_operations(node_metrics: List[Dict[str, Any]], output_language: str = 'ja') -> Dict[str, Any]:
     """
     Shuffle操作の妥当性を分析し、最適化推奨事項を生成する
     
@@ -47,6 +47,7 @@ def analyze_shuffle_operations(node_metrics: List[Dict[str, Any]]) -> Dict[str, 
     
     Args:
         node_metrics: ノードメトリクスのリスト
+        output_language: 出力言語 ('ja' or 'en')
         
     Returns:
         dict: Shuffle分析結果
@@ -180,45 +181,87 @@ def analyze_shuffle_operations(node_metrics: List[Dict[str, Any]]) -> Dict[str, 
             optimal_partition_count = int((memory_per_partition_mb / threshold_mb) * partition_count)
             
             if memory_per_partition_mb > threshold_mb * 4:  # 2GB以上
-                recommendations.append(
-                    f"🚨 非常に高いメモリ使用量 ({memory_per_partition_mb:.0f}MB/パーティション): "
-                    f"パーティション数を{optimal_partition_count}以上に増加するか、クラスターサイズを拡張してください"
-                )
-                recommendations.append("🖥️ クラスター拡張: より多くのワーカーノードまたは高メモリインスタンスの使用を検討")
+                if output_language == 'ja':
+                    recommendations.append(
+                        f"🚨 非常に高いメモリ使用量 ({memory_per_partition_mb:.0f}MB/パーティション): "
+                        f"パーティション数を{optimal_partition_count}以上に増加するか、クラスターサイズを拡張してください"
+                    )
+                    recommendations.append("🖥️ クラスター拡張: より多くのワーカーノードまたは高メモリインスタンスの使用を検討")
+                else:  # English
+                    recommendations.append(
+                        f"🚨 Very high memory usage ({memory_per_partition_mb:.0f}MB/partition): "
+                        f"Increase partition count to {optimal_partition_count} or more, or expand cluster size"
+                    )
+                    recommendations.append("🖥️ Cluster expansion: Consider using more worker nodes or high-memory instances")
             elif memory_per_partition_mb > threshold_mb * 2:  # 1GB以上  
-                recommendations.append(
-                    f"⚠️ 高いメモリ使用量 ({memory_per_partition_mb:.0f}MB/パーティション): "
-                    f"パーティション数を{optimal_partition_count}以上に増加することを強く推奨"
-                )
-                recommendations.append("⚙️ AQE設定: spark.sql.adaptive.advisoryPartitionSizeInBytes の調整を検討")
+                if output_language == 'ja':
+                    recommendations.append(
+                        f"⚠️ 高いメモリ使用量 ({memory_per_partition_mb:.0f}MB/パーティション): "
+                        f"パーティション数を{optimal_partition_count}以上に増加することを強く推奨"
+                    )
+                    recommendations.append("⚙️ AQE設定: spark.sql.adaptive.advisoryPartitionSizeInBytes の調整を検討")
+                else:  # English
+                    recommendations.append(
+                        f"⚠️ High memory usage ({memory_per_partition_mb:.0f}MB/partition): "
+                        f"Strongly recommend increasing partition count to {optimal_partition_count} or more"
+                    )
+                    recommendations.append("⚙️ AQE settings: Consider adjusting spark.sql.adaptive.advisoryPartitionSizeInBytes")
             else:
-                recommendations.append(
-                    f"💡 メモリ効率改善 ({memory_per_partition_mb:.0f}MB/パーティション): "
-                    f"パーティション数を{optimal_partition_count}に調整することを推奨"
-                )
+                if output_language == 'ja':
+                    recommendations.append(
+                        f"💡 メモリ効率改善 ({memory_per_partition_mb:.0f}MB/パーティション): "
+                        f"パーティション数を{optimal_partition_count}に調整することを推奨"
+                    )
+                else:  # English
+                    recommendations.append(
+                        f"💡 Memory efficiency improvement ({memory_per_partition_mb:.0f}MB/partition): "
+                        f"Recommend adjusting partition count to {optimal_partition_count}"
+                    )
         
         if peak_memory_gb > SHUFFLE_ANALYSIS_CONFIG["high_memory_threshold_gb"]:
-            recommendations.append(
-                f"🔧 Liquid Clusteringの実装により、Shuffle操作の削減を検討 "
-                f"(現在のメモリ使用量: {peak_memory_gb:.1f}GB)"
-            )
+            if output_language == 'ja':
+                recommendations.append(
+                    f"🔧 Liquid Clusteringの実装により、Shuffle操作の削減を検討 "
+                    f"(現在のメモリ使用量: {peak_memory_gb:.1f}GB)"
+                )
+            else:  # English
+                recommendations.append(
+                    f"🔧 Consider implementing Liquid Clustering to reduce Shuffle operations "
+                    f"(current memory usage: {peak_memory_gb:.1f}GB)"
+                )
             
         if duration_sec > SHUFFLE_ANALYSIS_CONFIG["long_execution_threshold_sec"]:
-            recommendations.append(
-                f"⏱️ 実行時間が長い ({duration_sec:.1f}秒): データ分散戦略の見直しを推奨"
-            )
+            if output_language == 'ja':
+                recommendations.append(
+                    f"⏱️ 実行時間が長い ({duration_sec:.1f}秒): データ分散戦略の見直しを推奨"
+                )
+            else:  # English
+                recommendations.append(
+                    f"⏱️ Long execution time ({duration_sec:.1f} seconds): Recommend reviewing data distribution strategy"
+                )
             
         if rows_processed > 1000000000:  # 10億行以上
-            recommendations.append(
-                f"📊 大量データ処理 ({rows_processed:,}行): "
-                "ブロードキャストJOINや事前集約の活用を検討"
-            )
+            if output_language == 'ja':
+                recommendations.append(
+                    f"📊 大量データ処理 ({rows_processed:,}行): "
+                    "ブロードキャストJOINや事前集約の活用を検討"
+                )
+            else:  # English
+                recommendations.append(
+                    f"📊 Large data processing ({rows_processed:,} rows): "
+                    "Consider using broadcast JOIN or pre-aggregation"
+                )
         
         # SQLクエリでのREPARTITIONヒントに関する推奨事項
         if not is_memory_efficient:
-            recommendations.append(
-                "🔧 SQLクエリで発生している場合はREPARTITONヒントもしくはREPARTITON_BY_RANGEヒント(Window関数使用時)を適切に設定してください"
-            )
+            if output_language == 'ja':
+                recommendations.append(
+                    "🔧 SQLクエリで発生している場合はREPARTITONヒントもしくはREPARTITON_BY_RANGEヒント(Window関数使用時)を適切に設定してください"
+                )
+            else:  # English
+                recommendations.append(
+                    "🔧 If occurring in SQL queries, please appropriately configure REPARTITION hints or REPARTITION_BY_RANGE hints (when using Window functions)"
+                )
         
         # Shuffle分析結果に追加
         shuffle_node_analysis = {
@@ -601,7 +644,7 @@ def analyze_query_profile_with_shuffle_optimization(json_file_path: str, output_
         node_metrics = extract_node_metrics_from_query_profile(query_profile)
         
         # Shuffle操作分析
-        shuffle_analysis = analyze_shuffle_operations(node_metrics)
+        shuffle_analysis = analyze_shuffle_operations(node_metrics, output_language)
         
         # レポート生成
         report_lines = []
