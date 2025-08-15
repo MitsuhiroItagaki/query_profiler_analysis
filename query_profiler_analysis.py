@@ -3466,8 +3466,16 @@ def analyze_liquid_clustering_opportunities(profiler_data: Dict[str, Any], metri
         efficiency = scan['rows'] / max(scan['duration_ms'], 1)
         scan_performance.append(f"  - {scan['name']}: {scan['rows']:,} rows, {scan['duration_ms']:,}ms, efficiency={efficiency:.1f} rows/ms")
 
+    # Generate language-appropriate clustering prompt
+    if OUTPUT_LANGUAGE == 'en':
+        prompt_intro = "You are a Databricks Liquid Clustering expert. Please analyze the following SQL profiler data and provide optimal Liquid Clustering recommendations."
+        output_instruction = "Please provide concise and practical analysis results in English."
+    else:
+        prompt_intro = "You are a Databricks Liquid Clustering expert. Please analyze the following SQL profiler data and provide optimal Liquid Clustering recommendations."
+        output_instruction = "簡潔で実践的な分析結果を日本語で提供してください。"
+    
     clustering_prompt = f"""
-You are a Databricks Liquid Clustering expert. Please analyze the following SQL profiler data and provide optimal Liquid Clustering recommendations.
+{prompt_intro}
 
 【Query Performance Overview】
 - Execution time: {total_time_sec:.1f} seconds
@@ -3567,7 +3575,7 @@ You are a Databricks Liquid Clustering expert. Please analyze the following SQL 
 ✅ Suggest completely new clustering columns only if current ones are suboptimal
 ✅ State "現在のクラスタリングキーが最適なため変更不要" when current clustering is good
 
-簡潔で実践的な分析結果を日本語で提供してください。
+{output_instruction}
 
 【重要な出力形式指示】
 各テーブルの分析では、必ず以下の形式で現在のクラスタリングキー情報とフィルタ率を含めてください：
@@ -8355,15 +8363,28 @@ Shuffle効率性スコア: {efficiency_rate:.1f}%
             "Replace UDFs with built-in SQL functions, avoid non-vectorized regex features, prefer deterministic built-ins, and use Photon-friendly expressions."
         )
     
-    optimization_prompt = f"""
-あなたはDatabricksのSQLパフォーマンス最適化の専門家です。以下の**詳細なボトルネック分析結果**を基に、**処理速度重視**でSQLクエリを最適化してください。
+    # Generate language-appropriate prompt header based on OUTPUT_LANGUAGE
+    if OUTPUT_LANGUAGE == 'en':
+        prompt_header = """You are a Databricks SQL performance optimization expert. Please optimize the SQL query with **processing speed focus** based on the following **detailed bottleneck analysis results**.
+
+【Important Processing Guidelines】
+- Generate a complete SQL query in one output
+- Staged output or multiple-stage output is prohibited
+- Thinking function for structure understanding → complete SQL output in one go
+- **❌ BROADCAST hints (/*+ BROADCAST */, /*+ BROADCAST(table) */) are strictly prohibited**
+- **✅ JOIN strategy optimization relies on Spark's automatic optimization without hints**"""
+    else:
+        prompt_header = """あなたはDatabricksのSQLパフォーマンス最適化の専門家です。以下の**詳細なボトルネック分析結果**を基に、**処理速度重視**でSQLクエリを最適化してください。
 
 【重要な処理方針】
 - 一回の出力で完全なSQLクエリを生成してください
 - 段階的な出力や複数回に分けての出力は禁止です
 - thinking機能で構造理解→一回で完全なSQL出力
 - **❌ BROADCASTヒント（/*+ BROADCAST */、/*+ BROADCAST(table) */）は一切使用禁止**
-- **✅ JOIN戦略はSparkの自動最適化に委ねてヒント不使用で最適化**
+- **✅ JOIN戦略はSparkの自動最適化に委ねてヒント不使用で最適化**"""
+
+    optimization_prompt = f"""
+{prompt_header}
 
 【元のSQLクエリ】
 ```sql
@@ -8712,6 +8733,60 @@ FROM table1 cs
 2. **FROM句、JOIN句、WHERE句内には絶対に配置しない**
 3. **REPARTITIONヒントには適切なパーティション数とカラム名を指定**
 
+""" + ("""
+【Output Format】
+## 🚀 Processing Speed-Focused Optimized SQL
+
+**🎯 Actually Applied Optimization Techniques** (Do not list techniques that were not implemented):
+- [List only optimization techniques that were actually implemented]
+- ❌ When spill not detected: Do not list REPARTITION hint application
+- ❌ Elements not actually changed: Do not list as "optimization"
+- ✅ Only actual changes: JOIN order changes, CTE structuring, filter improvements, etc.
+
+**💰 EXPLAIN COST-Based Impact Analysis**:
+- Query execution cost reduction ratio: [cost_ratio]x (EXPLAIN COST comparison result)
+- Memory usage reduction ratio: [memory_ratio]x (statistics-based comparison)
+- Estimated data processing efficiency: [processing_efficiency]% (scan & JOIN efficiency improvement)
+- ⚠️ Numbers are based on cost comparison results during optimization process
+
+**🚨 Final Syntax Error Prevention Check**:
+- ✅ REPARTITION hints are properly placed immediately after main query SELECT
+- ✅ No hints placed within FROM, JOIN, or WHERE clauses
+- ✅ REPARTITION hints specify appropriate partition count and column names
+- ✅ **DISTINCT clause is preserved when present in original query**
+- ✅ **DISTINCT clause not removed when adding hint clauses**
+- ✅ **DISTINCT clause correctly placed immediately after hint clauses**
+- ✅ No placeholders (..., [omitted], etc.) used
+- ✅ Complete SQL syntax (not incomplete query)
+- ✅ NULL literals properly cast with appropriate types
+- ✅ JOIN order efficiently optimized
+- ✅ Structure considers both spill prevention and parallelism improvement
+- ✅ **No BROADCAST hints used (syntax error prevention)**
+- ✅ **Optimized without hints relying on Spark's automatic JOIN strategy**
+
+```sql
+-- 🚨 Important: REPARTITION hints placed immediately after main query SELECT statement
+-- Example: SELECT /*+ REPARTITION(calculated_partitions, column_name) */ column1, column2, ...
+-- 🚨 DISTINCT preservation example: SELECT /*+ REPARTITION(calculated_partitions, column_name) */ DISTINCT cs.ID, cs.column1, ...
+-- 🚨 Proper REPARTITION hint placement: SELECT /*+ REPARTITION(calculated_partitions, join_key) */ column1, column2, ...
+-- ❌ Prohibited: BROADCAST hints (/*+ BROADCAST */, /*+ BROADCAST(table) */) are strictly forbidden
+-- ✅ Recommended: Optimize without hints relying on Spark's automatic JOIN strategy
+[Complete SQL - describe all columns, CTEs, and table names without omission]
+```
+
+## Improvement Points
+[3 major improvement points]
+
+## JOIN Optimization Rationale
+[Detailed rationale for JOIN order optimization]
+- 📏 Table size-based optimization: Efficient join order from small to large tables
+- 🎯 Optimization target tables: [table name list]
+- ⚖️ JOIN strategy: Efficient join processing utilizing Spark's automatic optimization
+- 🚀 Expected effects: [Network transfer reduction, JOIN processing acceleration, shuffle reduction, etc.]
+
+## Expected Effects  
+[Expected improvement in execution time, memory, and spill (including JOIN optimization effects)]
+""" if OUTPUT_LANGUAGE == 'en' else """
 【出力形式】
 ## 🚀 処理速度重視の最適化されたSQL
 
@@ -8764,6 +8839,7 @@ FROM table1 cs
 
 ## 期待効果  
 [実行時間・メモリ・スピル改善の見込み（JOIN最適化効果を含む）]
+""")
 """
 
     # 設定されたLLMプロバイダーを使用
@@ -9642,8 +9718,52 @@ def summarize_explain_results_with_llm(explain_content: str, explain_cost_conten
     
     print(f"📊 EXPLAIN + EXPLAIN COST total size: {total_size:,} characters (summary executed)")
     
-    # 要約用プロンプト
-    summarization_prompt = f"""
+    # Language-appropriate summarization prompt
+    if OUTPUT_LANGUAGE == 'en':
+        summarization_prompt = f"""
+You are a Databricks SQL performance expert. Please provide a concise summary of the following EXPLAIN + EXPLAIN COST results.
+
+【Target Data for Summary】
+- Query type: {query_type}
+- EXPLAIN result size: {len(explain_content):,} characters
+- EXPLAIN COST result size: {len(explain_cost_content):,} characters
+
+【EXPLAIN Results】
+```
+{explain_content[:20000]}{"..." if len(explain_content) > 20000 else ""}
+```
+
+【EXPLAIN COST Results】  
+```
+{explain_cost_content[:20000]}{"..." if len(explain_cost_content) > 20000 else ""}
+```
+
+【Summary Instructions】
+Please provide a concise summary in the following format (within 5000 characters total):
+
+## 📊 Physical Plan Summary
+- Major processing steps (5-10 important operations)
+- JOIN methods and data movement patterns
+- Photon utilization status and bottlenecks
+
+## 💰 Statistics Summary
+- Important table size and row count information
+- JOIN selectivity and filter efficiency
+- Memory usage and spill predictions
+- Partition distribution status
+
+## ⚡ Performance Analysis
+- Execution cost breakdown
+- Operations likely to become bottlenecks
+- Areas with optimization potential
+
+【Important】: 
+- Record numerical data accurately
+- Prioritize information important for SQL optimization
+- Summarize concisely within 5000 characters
+"""
+    else:
+        summarization_prompt = f"""
 あなたはDatabricksのSQLパフォーマンス専門家です。以下のEXPLAIN + EXPLAIN COST結果を簡潔に要約してください。
 
 【要約対象データ】
@@ -12587,8 +12707,14 @@ def generate_improved_query_for_performance_degradation(original_query: str, ana
 - 具体的問題: {', '.join(specific_issues)}
 """
 
-    # パフォーマンス悪化修正に特化したプロンプト
-    performance_improvement_prompt = f"""
+    # Language-appropriate performance improvement prompt
+    if OUTPUT_LANGUAGE == 'en':
+        performance_improvement_prompt = f"""
+You are a Databricks SQL performance optimization expert.
+
+Performance degradation occurred in the previous optimization. Please perform **fundamental improvements** based on the degradation cause analysis.
+    else:
+        performance_improvement_prompt = f"""
 あなたはDatabricksのSQLパフォーマンス最適化の専門家です。
 
 前回の最適化でパフォーマンス悪化が発生しました。悪化原因分析に基づいて **根本的な改善** を行ってください。
@@ -12652,6 +12778,22 @@ def generate_improved_query_for_performance_degradation(original_query: str, ana
 - 機能性を一切損なわない
 - 完全で実行可能なSQLのみ出力
 
+""" + ("""
+【Output Format】
+## 🚀 Performance Improved SQL
+
+**Improved Content**:
+- [Specific fixes for degradation causes]
+- [Removed/modified optimization elements]
+- [Newly applied improvement measures]
+
+```sql
+[Complete SQL - Performance improved]
+```
+
+## Improvement Details
+[Solution methods for degradation causes and explanation of expected performance improvements]
+""" if OUTPUT_LANGUAGE == 'en' else """
 【出力形式】
 ## 🚀 パフォーマンス改善SQL
 
@@ -12666,6 +12808,7 @@ def generate_improved_query_for_performance_degradation(original_query: str, ana
 
 ## 改善詳細
 [悪化原因の解決方法と期待される性能改善の説明]
+""")
 """
 
     # 設定されたLLMプロバイダーを使用
@@ -12785,7 +12928,14 @@ def generate_optimized_query_with_error_feedback(original_query: str, analysis_r
     
     specific_guidance = generate_specific_error_guidance(error_info)
 
-    error_feedback_prompt = f"""
+    # Language-appropriate error feedback prompt
+    if OUTPUT_LANGUAGE == 'en':
+        error_feedback_prompt = f"""
+You are a Databricks SQL performance optimization and error correction expert.
+
+An error occurred during EXPLAIN execution of the following optimized query. Please correct based on the error information **while preserving optimization elements**.
+    else:
+        error_feedback_prompt = f"""
 あなたはDatabricksのSQLパフォーマンス最適化とエラー修正の専門家です。
 
 以下の最適化クエリでEXPLAIN実行時にエラーが発生しました。**最適化要素を保持しながら**エラー情報を基に修正してください。
@@ -12913,6 +13063,25 @@ FROM store_sales ss
 - 元のクエリのDISTINCT句は必ず保持
 - 実際に実行できる完全なSQLクエリのみを出力
 
+""" + ("""
+【Output Format】
+## 🔧 Error-Corrected Optimized SQL
+
+**Corrected Content**:
+- [Specific error correction points]
+
+**Preserved Optimization Elements**:
+- [Preserved REPARTITION hints]
+- [Preserved JOIN order optimization]
+- [Preserved other optimization techniques]
+
+```sql
+[Complete SQL - Error corrected, optimization elements preserved]
+```
+
+## Correction Details
+[Error causes and correction methods, explanation of optimization element preservation]
+""" if OUTPUT_LANGUAGE == 'en' else """
 【出力形式】
 ## 🔧 エラー修正済み最適化SQL
 
@@ -12930,6 +13099,7 @@ FROM store_sales ss
 
 ## 修正詳細
 [エラーの原因と修正方法、および最適化要素保持の説明]
+""")
 """
 
     # 設定されたLLMプロバイダーを使用
