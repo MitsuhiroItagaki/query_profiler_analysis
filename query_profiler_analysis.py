@@ -4256,8 +4256,8 @@ def analyze_bottlenecks_with_llm(metrics: Dict[str, Any]) -> str:
         print("🔍 For bottleneck analysis: Searching EXPLAIN + EXPLAIN COST result files...")
         
         # 最新のEXPLAIN結果ファイルを検索
-        explain_original_files = glob.glob("output_explain_original_*.txt")
-        explain_optimized_files = glob.glob("output_explain_optimized_*.txt")
+        explain_original_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_original_*.txt")
+        explain_optimized_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_optimized_*.txt")
         explain_files = explain_original_files if explain_original_files else explain_optimized_files
         
         if explain_files:
@@ -4305,8 +4305,8 @@ def analyze_bottlenecks_with_llm(metrics: Dict[str, Any]) -> str:
         
         # フォールバック: キャッシュが利用できない場合は従来のファイル検索
         if not cached_cost_result:
-            cost_original_files = glob.glob("output_explain_cost_original_*.txt")
-            cost_optimized_files = glob.glob("output_explain_cost_optimized_*.txt")
+            cost_original_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_cost_original_*.txt")
+            cost_optimized_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_cost_optimized_*.txt")
             cost_files = cost_original_files if cost_original_files else cost_optimized_files
             
             if cost_files:
@@ -4325,7 +4325,7 @@ def analyze_bottlenecks_with_llm(metrics: Dict[str, Any]) -> str:
         
         if not explain_files and not cost_files:
             # フォールバック: 古いファイル名パターンもチェック
-            old_explain_files = glob.glob("output_explain_plan_*.txt")
+            old_explain_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_plan_*.txt")
             if old_explain_files:
                 latest_explain_file = max(old_explain_files, key=os.path.getctime)
                 try:
@@ -7839,8 +7839,8 @@ def generate_optimized_query_with_llm(original_query: str, analysis_result: str,
         print("🔍 Searching for EXPLAIN + EXPLAIN COST result files...")
         
         # 1. Search for latest EXPLAIN result files (supporting new filename patterns)
-        explain_original_files = glob.glob("output_explain_original_*.txt")
-        explain_optimized_files = glob.glob("output_explain_optimized_*.txt")
+        explain_original_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_original_*.txt")
+        explain_optimized_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_optimized_*.txt")
         
         # Prioritize original query EXPLAIN results, use optimized if not available
         explain_files = explain_original_files if explain_original_files else explain_optimized_files
@@ -7933,8 +7933,8 @@ def generate_optimized_query_with_llm(original_query: str, analysis_result: str,
         # フォールバック: キャッシュが利用できない場合は従来のファイル検索
         if not cached_cost_result:
             # 2. Search for latest EXPLAIN COST result files
-            cost_original_files = glob.glob("output_explain_cost_original_*.txt")
-            cost_optimized_files = glob.glob("output_explain_cost_optimized_*.txt")
+            cost_original_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_cost_original_*.txt")
+            cost_optimized_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_cost_optimized_*.txt")
             
             # Prioritize original query EXPLAIN COST results, use optimized if not available
             cost_files = cost_original_files if cost_original_files else cost_optimized_files
@@ -8024,7 +8024,7 @@ def generate_optimized_query_with_llm(original_query: str, analysis_result: str,
         if not explain_files and not cost_files:
             print("⚠️ EXPLAIN・EXPLAIN COST result files not found")
             # フォールバック: 古いファイル名パターンもチェック
-            old_explain_files = glob.glob("output_explain_plan_*.txt")
+            old_explain_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_plan_*.txt")
             if old_explain_files:
                 latest_explain_file = max(old_explain_files, key=os.path.getctime)
                 try:
@@ -10349,7 +10349,7 @@ def generate_comprehensive_optimization_report(query_id: str, optimized_result: 
     import glob
     import os
     
-    optimized_sql_files = glob.glob("output_optimized_query_*.sql")
+    optimized_sql_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_optimized_query_*.sql")
     latest_sql_filename = ""
     if optimized_sql_files:
         # 最新のファイルを取得（ファイル名のタイムスタンプでソート）
@@ -10360,8 +10360,8 @@ def generate_comprehensive_optimization_report(query_id: str, optimized_result: 
         print("🔍 For comprehensive report: Searching EXPLAIN + EXPLAIN COST result files...")
         
         # 1. 最新のEXPLAIN結果ファイルを検索（新しいファイル名パターン対応）
-        explain_original_files = glob.glob("output_explain_original_*.txt")
-        explain_optimized_files = glob.glob("output_explain_optimized_*.txt")
+        explain_original_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_original_*.txt")
+        explain_optimized_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_optimized_*.txt")
         
         # 2. 最新のEXPLAIN COST結果ファイルを検索
         # 🚀 オリジナルファイルはキャッシュから取得（可能な場合）
@@ -10373,9 +10373,9 @@ def generate_comprehensive_optimization_report(query_id: str, optimized_result: 
             print(f"💾 Using cached original EXPLAIN COST file for comprehensive report")
         else:
             # フォールバック: 従来のファイル検索
-            cost_original_files = glob.glob("output_explain_cost_original_*.txt")
+            cost_original_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_cost_original_*.txt")
         
-        cost_optimized_files = glob.glob("output_explain_cost_optimized_*.txt")
+        cost_optimized_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_cost_optimized_*.txt")
         
         # 🎯 ベスト試行番号が指定されている場合、対応するファイルを優先選択
         if best_attempt_number is not None:
@@ -10418,7 +10418,7 @@ def generate_comprehensive_optimization_report(query_id: str, optimized_result: 
                 print(f"⚠️ Failed to load EXPLAIN results: {str(e)}")
         else:
             # フォールバック: 古いファイル名パターンもチェック
-            old_explain_files = glob.glob("output_explain_plan_*.txt")
+            old_explain_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_plan_*.txt")
             if old_explain_files:
                 latest_explain_file = max(old_explain_files, key=os.path.getctime)
                 try:
@@ -10985,7 +10985,7 @@ The following shows the trials executed during the optimization process and the 
         explain_summary_section = ""
         try:
             # 🚀 最適化成功時はオリジナル要約ファイルの検索をスキップ（エラーリスク排除）
-            optimized_files = glob.glob("output_explain_summary_optimized_*.md")
+            optimized_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_summary_optimized_*.md")
             
             if optimization_success is True:
                 # 最適化成功時はオリジナルファイルが生成されないため、最適化ファイルのみ検索
@@ -10993,7 +10993,7 @@ The following shows the trials executed during the optimization process and the 
                 print("💰 Skipping original summary file search (optimization succeeded - cost reduction)")
             else:
                 # 通常は両方のパターンを検索
-                original_files = glob.glob("output_explain_summary_original_*.md")
+                original_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_summary_original_*.md")
                 all_explain_files = optimized_files + original_files
             
             if all_explain_files:
@@ -13647,8 +13647,8 @@ def comprehensive_performance_judgment(original_metrics, optimized_metrics):
                 or ""
             )
             # 直近の保存ファイルを参照
-            original_files = glob.glob("output_original_query_*.sql")
-            optimized_files = glob.glob("output_optimized_query_*.sql")
+            original_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_original_query_*.sql")
+            optimized_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_optimized_query_*.sql")
             if original_files:
                 original_files.sort(reverse=True)
                 latest_original_file = original_files[0]
@@ -16733,7 +16733,7 @@ def find_latest_report_file() -> str:
     
     # 現在のディレクトリでレポートファイルを検索 (言語別対応)
     language_suffix = 'en' if OUTPUT_LANGUAGE == 'en' else 'jp'
-    pattern = f"output_optimization_report_{language_suffix}_*.md"
+    pattern = f"{OUTPUT_FILE_DIR}/output_optimization_report_{language_suffix}_*.md"
     report_files = glob.glob(pattern)
     
     if not report_files:
@@ -16750,7 +16750,7 @@ def find_latest_shuffle_analysis_file() -> str:
     
     # 現在のディレクトリでShuffle分析ファイルを検索 (言語別対応)
     language_suffix = 'en' if OUTPUT_LANGUAGE == 'en' else 'jp'
-    pattern = f"output_enhanced_shuffle_analysis_{language_suffix}_*.md"
+    pattern = f"{OUTPUT_FILE_DIR}/output_enhanced_shuffle_analysis_{language_suffix}_*.md"
     shuffle_files = glob.glob(pattern)
     
     if not shuffle_files:
@@ -17081,13 +17081,13 @@ try:
         
         # 関連ファイルの存在チェック
         import glob
-        sql_files = glob.glob("output_optimized_query_*.sql")
-        original_files = glob.glob("output_original_query_*.sql")
-        all_reports = glob.glob("output_optimization_report*.md")
+        sql_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_optimized_query_*.sql")
+        original_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_original_query_*.sql")
+        all_reports = glob.glob(f"{OUTPUT_FILE_DIR}/output_optimization_report*.md")
         
         # 現在の言語設定に対応するレポートファイル
         language_suffix = 'en' if OUTPUT_LANGUAGE == 'en' else 'jp'
-        current_lang_reports = glob.glob(f"output_optimization_report_{language_suffix}_*.md")
+        current_lang_reports = glob.glob(f"{OUTPUT_FILE_DIR}/output_optimization_report_{language_suffix}_*.md")
         
         print(f"\n📁 Current file status:")
         print(f"   📄 Optimized query files: {len(sql_files)} files")
@@ -17237,11 +17237,11 @@ if debug_enabled.upper() == 'Y':
     
     # 保持されるファイル一覧を表示
     if explain_enabled.upper() == 'Y':
-        original_files = glob.glob("output_explain_original_*.txt")
-        optimized_files = glob.glob("output_explain_optimized_*.txt")
-        cost_original_files = glob.glob("output_explain_cost_original_*.txt")
-        cost_optimized_files = glob.glob("output_explain_cost_optimized_*.txt")
-        error_files = glob.glob("output_explain_error_*.txt")
+        original_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_original_*.txt")
+        optimized_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_optimized_*.txt")
+        cost_original_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_cost_original_*.txt")
+        cost_optimized_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_cost_optimized_*.txt")
+        error_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_error_*.txt")
         all_files = original_files + optimized_files + cost_original_files + cost_optimized_files + error_files
         
         if all_files:
