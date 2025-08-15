@@ -15019,7 +15019,16 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
             pass
         
         # EXPLAIN実行と構文チェック
-        explain_result = execute_explain_with_retry_logic(current_query, analysis_result, metrics, max_retries=MAX_RETRIES)
+        # 🔧 修正: 重複防止のため、single_optimization debug保存は初回のみ
+        save_single_opt_debug = (attempt_num == 1)
+        explain_result = execute_explain_with_retry_logic(
+            current_query, 
+            analysis_result, 
+            metrics, 
+            max_retries=MAX_RETRIES, 
+            current_attempt_num=attempt_num,
+            save_single_optimization_debug=save_single_opt_debug
+        )
         
         if explain_result['final_status'] != 'success':
             print(f"⚠️ Attempt {attempt_num}: EXPLAIN execution failed")
@@ -15584,10 +15593,14 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
     }
 
 
-def execute_explain_with_retry_logic(original_query: str, analysis_result: str, metrics: Dict[str, Any], max_retries: int = 3) -> Dict[str, Any]:
+def execute_explain_with_retry_logic(original_query: str, analysis_result: str, metrics: Dict[str, Any], max_retries: int = 3, current_attempt_num: int = 1, save_single_optimization_debug: bool = True) -> Dict[str, Any]:
     """
     EXPLAIN execution and error correction retry logic (syntax errors only)
     Attempts automatic correction up to max_retries times, uses original query on failure
+    
+    Args:
+        current_attempt_num: Current optimization attempt number for proper file naming
+        save_single_optimization_debug: Whether to save single_optimization debug file (prevents duplicates)
     """
     from datetime import datetime
     
@@ -15598,9 +15611,9 @@ def execute_explain_with_retry_logic(original_query: str, analysis_result: str, 
     print("🤖 Step 1: Initial optimization query generation")
     optimized_query = generate_optimized_query_with_llm(original_query, analysis_result, metrics)
     
-    # 🐛 DEBUG: 単体最適化クエリを保存（反復最適化以外のパス）
-    if isinstance(optimized_query, str) and not optimized_query.startswith("LLM_ERROR:"):
-        save_debug_query_trial(optimized_query, 1, "single_optimization", query_id="direct_path")
+    # 🐛 DEBUG: 単体最適化クエリを保存（重複防止のため条件付き）
+    if isinstance(optimized_query, str) and not optimized_query.startswith("LLM_ERROR:") and save_single_optimization_debug:
+        save_debug_query_trial(optimized_query, current_attempt_num, "single_optimization", query_id="direct_path")
     
     # LLMエラーチェック（重要）
     if isinstance(optimized_query, str) and optimized_query.startswith("LLM_ERROR:"):
