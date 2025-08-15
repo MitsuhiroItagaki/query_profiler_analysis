@@ -2702,7 +2702,7 @@ def calculate_bottleneck_indicators(metrics: Dict[str, Any]) -> Dict[str, Any]:
         indicators['total_shuffle_io_bytes'] = total_shuffle_io_bytes
         
         # 全体I/Oに対するシャッフルI/Oの比率
-        total_io_bytes = overall_metrics.get('read_bytes', 0) + overall_metrics.get('read_remote_bytes', 0)
+        total_io_bytes = overall.get('read_bytes', 0) + overall.get('read_remote_bytes', 0)
         if total_io_bytes > 0:
             indicators['shuffle_io_ratio'] = total_shuffle_io_bytes / total_io_bytes
         else:
