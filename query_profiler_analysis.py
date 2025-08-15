@@ -16959,6 +16959,7 @@ def refine_report_content_with_llm(report_content: str) -> str:
 4. 技術用語を保持しつつ、理解しやすい説明を追加
 5. 数値データとメトリクスを保持
 6. 実用的な推奨事項を明確に提示
+7. **重複情報の統合**: 「Table Optimization Recommendations」セクションと「Additional Table Analysis」セクション間で同一テーブルに関する重複情報を特定し、より詳細で包括的な情報を持つセクションに統合する。重複する情報は削除し、各テーブルの情報は一箇所のみに記載する
 
 【🚨 削除・修正してはいけない重要情報】
 - **現在のクラスタリングキー情報**: "現在のクラスタリングキー: XX" または "設定なし" の表示
@@ -16987,6 +16988,7 @@ def refine_report_content_with_llm(report_content: str) -> str:
 - **必須**: テーブル別詳細分析情報（現在キー、推奨キー、フィルタ率）を削除しない
 - **必須**: SQL実装例（ALTER TABLE、CLUSTER BY等）を完全な形で保持
 - **必須**: Enhanced Shuffle操作最適化分析セクションの内容を完全に保持し、構造と数値データを維持
+- **重複排除**: 同一テーブルの情報が複数セクションに記載されている場合は、より包括的で詳細な情報を持つセクションに統合し、重複部分を削除する
 """
     else:
         refinement_prompt = f"""You are a technical document editor. Please refine the following Databricks SQL performance analysis report to make it readable and concise.
@@ -16998,6 +17000,7 @@ def refine_report_content_with_llm(report_content: str) -> str:
 4. Keep technical terms while adding understandable explanations
 5. Preserve numerical data and metrics
 6. Clearly present practical recommendations
+7. **Eliminate Duplicate Information**: Identify and eliminate redundant content between "Table Optimization Recommendations" and "Additional Table Analysis" sections for the same tables. Consolidate information into the more comprehensive section and ensure each table's information appears only once in the report
 
 【🚨 Critical Information That Must NOT Be Deleted or Modified】
 - **Current clustering key information**: Display "Current clustering key: XX" or "Not configured"
@@ -17026,6 +17029,7 @@ def refine_report_content_with_llm(report_content: str) -> str:
 - **Required**: Do not delete detailed analysis information by table (current key, recommended key, filter rate)
 - **Required**: Preserve SQL implementation examples (ALTER TABLE, CLUSTER BY, etc.) in complete form
 - **Required**: Completely preserve Enhanced Shuffle Operations Optimization Analysis section content, maintaining structure and numerical data
+- **Eliminate Duplicates**: When the same table information appears in multiple sections, consolidate into the more comprehensive and detailed section, removing duplicate portions
 """
     
     try:
