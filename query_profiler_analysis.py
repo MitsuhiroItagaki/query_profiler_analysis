@@ -2692,20 +2692,25 @@ def calculate_bottleneck_indicators(metrics: Dict[str, Any]) -> Dict[str, Any]:
         total_shuffle_cumulative_time = 0
         total_cumulative_time = 0
         
-        # 全ノードの累積時間を計算
+        # 全ノードの累積時間を計算（重複を避けて各ノードの代表値を使用）
         for node_metric in metrics.get('node_metrics', []):
-            node_cumulative_time = 0
+            node_cumulative_times = []
             if 'metrics' in node_metric:
+                # 1つのノードの全てのCumulative timeを収集
                 for metric in node_metric['metrics']:
                     if metric.get('name') == 'Cumulative time' and metric.get('value'):
-                        node_cumulative_time = metric['value']
-                        total_cumulative_time += node_cumulative_time
-                        break
+                        node_cumulative_times.append(metric['value'])
             
-            # シャッフルノードの場合は累積
-            node_name = node_metric.get('name', '').upper()
-            if any(keyword in node_name for keyword in ['SHUFFLE', 'EXCHANGE']):
-                total_shuffle_cumulative_time += node_cumulative_time
+            # ノードの代表累積時間を決定（Source/Sink重複を避ける）
+            if node_cumulative_times:
+                # 複数ある場合は最大値を使用（より包括的な時間）
+                representative_time = max(node_cumulative_times)
+                total_cumulative_time += representative_time
+                
+                # シャッフルノードの場合は累積
+                node_name = node_metric.get('name', '').upper()
+                if any(keyword in node_name for keyword in ['SHUFFLE', 'EXCHANGE']):
+                    total_shuffle_cumulative_time += representative_time
         
         indicators['total_shuffle_time_ms'] = total_shuffle_cumulative_time
         # 累積時間同士で比較（並列実行における正しい影響度計算）
