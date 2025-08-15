@@ -3474,11 +3474,11 @@ def analyze_liquid_clustering_opportunities(profiler_data: Dict[str, Any], metri
 
     # Generate language-appropriate clustering prompt
     if OUTPUT_LANGUAGE == 'en':
-        prompt_intro = "You are a Databricks Liquid Clustering expert. Please analyze the following SQL profiler data and provide optimal Liquid Clustering recommendations."
-        output_instruction = "Please provide concise and practical analysis results in English."
+        prompt_intro = "You are a Databricks Liquid Clustering expert. Please analyze the following SQL profiler data and provide optimal Liquid Clustering recommendations. **🚨 IMPORTANT: Provide only single, complete SQL statements - never decompose into multiple separate SQL queries.**"
+        output_instruction = "Please provide concise and practical analysis results in English. **🚨 Use only single SQL statements per table - never provide multiple separate SQL queries.**"
     else:
-        prompt_intro = "You are a Databricks Liquid Clustering expert. Please analyze the following SQL profiler data and provide optimal Liquid Clustering recommendations."
-        output_instruction = "簡潔で実践的な分析結果を日本語で提供してください。"
+        prompt_intro = "You are a Databricks Liquid Clustering expert. Please analyze the following SQL profiler data and provide optimal Liquid Clustering recommendations. **🚨 重要: 必ず単体の完全なSQL文のみを提供し、複数の分割されたSQLクエリには絶対に分解しないでください。**"
+        output_instruction = "簡潔で実践的な分析結果を日本語で提供してください。**🚨 テーブルごとに単体のSQL文のみを使用し、複数の分割されたSQLクエリは絶対に提供しないでください。**"
     
     clustering_prompt = f"""
 {prompt_intro}
@@ -8374,6 +8374,10 @@ Shuffle効率性スコア: {efficiency_rate:.1f}%
         prompt_header = """You are a Databricks SQL performance optimization expert. Please optimize the SQL query with **processing speed focus** based on the following **detailed bottleneck analysis results**.
 
 【Important Processing Guidelines】
+- **🚨 You must provide only a single SQL query as the response**
+- **❌ Decomposing the response into multiple SQL queries is absolutely prohibited**
+- **❌ Staged multiple SQL outputs or providing multiple separate SQL statements is strictly forbidden**
+- **✅ You must always respond with one complete, integrated SQL query**
 - Generate a complete SQL query in one output
 - Staged output or multiple-stage output is prohibited
 - Thinking function for structure understanding → complete SQL output in one go
@@ -8383,6 +8387,10 @@ Shuffle効率性スコア: {efficiency_rate:.1f}%
         prompt_header = """あなたはDatabricksのSQLパフォーマンス最適化の専門家です。以下の**詳細なボトルネック分析結果**を基に、**処理速度重視**でSQLクエリを最適化してください。
 
 【重要な処理方針】
+- **🚨 必ず単体のSQLクエリのみを回答してください**
+- **❌ 複数のSQLクエリに分解した回答は絶対に禁止です**
+- **❌ 段階的な複数SQLの出力や分割された複数のSQL文の提示は一切禁止です**
+- **✅ 必ず1つの完全なSQLクエリとして統合された形で回答してください**
 - 一回の出力で完全なSQLクエリを生成してください
 - 段階的な出力や複数回に分けての出力は禁止です
 - thinking機能で構造理解→一回で完全なSQL出力
