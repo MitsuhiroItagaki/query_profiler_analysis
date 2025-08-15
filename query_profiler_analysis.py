@@ -16984,6 +16984,7 @@ def refine_report_content_with_llm(report_content: str) -> str:
 - **パーセンテージ計算**: 各プロセスの "全体のXX%" 表示（並列実行を考慮した正確な計算）
 - **推奨vs現在の比較分析**: 推奨クラスタリングキーと現在のキーの比較情報
 - **具体的な数値メトリクス**: 実行時間、データ読み込み量、スピル量、利用率等
+- **並列度情報**: "🔧 並列度: Sink - Tasks total: XXXX | Source - Tasks total: XXX" の形式表示（並列実行効率の重要指標）
 - **SQL実装例**: ALTER TABLE構文、CLUSTER BY文、ヒント句等の具体例
 - **テーブル別詳細情報**: 各テーブルのノード情報、フィルタ効率、推奨事項
 - **Enhanced Shuffle操作最適化分析**: Shuffle操作の詳細分析、メモリ使用量、パーティション数、効率性評価等の情報
@@ -17000,6 +17001,7 @@ def refine_report_content_with_llm(report_content: str) -> str:
 - Photon利用率評価の明確な表示
 - **必須**: 現在のクラスタリングキー情報とフィルタ率情報の完全保持
 - **必須**: パーセンテージ計算では元の正確な数値を使用
+- **必須**: 並列度情報（🔧 並列度: Sink - Tasks total: XXXX | Source - Tasks total: XXX）を完全に保持
 - **必須**: テーブル別詳細分析情報（現在キー、推奨キー、フィルタ率）を削除しない
 - **必須**: SQL実装例（ALTER TABLE、CLUSTER BY等）を完全な形で保持
 - **必須**: Enhanced Shuffle操作最適化分析セクションの内容を完全に保持し、構造と数値データを維持
@@ -17021,6 +17023,7 @@ def refine_report_content_with_llm(report_content: str) -> str:
 - **Percentage calculations**: Display "XX% of total" for each process (accurate calculations considering parallel execution)
 - **Recommended vs current comparison analysis**: Comparison information between recommended clustering keys and current keys
 - **Specific numerical metrics**: Execution time, data read volume, spill volume, utilization rates, etc.
+- **Parallelism information**: Format "🔧 Parallelism: Sink - Tasks total: XXXX | Source - Tasks total: XXX" (critical metric for parallel execution efficiency)
 - **SQL implementation examples**: Specific examples of ALTER TABLE syntax, CLUSTER BY statements, hint clauses, etc.
 - **Table-specific detailed information**: Node information, filter efficiency, and recommendations for each table
 - **Enhanced Shuffle Operations Optimization Analysis**: Detailed analysis of shuffle operations, memory usage, partition counts, efficiency evaluations, etc.
@@ -17037,6 +17040,7 @@ def refine_report_content_with_llm(report_content: str) -> str:
 - Clearly display Photon utilization rate evaluation
 - **Required**: Completely preserve current clustering key information and filter rate information
 - **Required**: Use original accurate numerical values for percentage calculations
+- **Required**: Completely preserve parallelism information (🔧 Parallelism: Sink - Tasks total: XXXX | Source - Tasks total: XXX)
 - **Required**: Do not delete detailed analysis information by table (current key, recommended key, filter rate)
 - **Required**: Preserve SQL implementation examples (ALTER TABLE, CLUSTER BY, etc.) in complete form
 - **Required**: Completely preserve Enhanced Shuffle Operations Optimization Analysis section content, maintaining structure and numerical data
