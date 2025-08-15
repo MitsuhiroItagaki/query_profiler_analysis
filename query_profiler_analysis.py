@@ -2663,21 +2663,21 @@ def calculate_bottleneck_indicators(metrics: Dict[str, Any]) -> Dict[str, Any]:
     indicators['shuffle_operations_count'] = len(shuffle_nodes)
     indicators['low_parallelism_stages_count'] = len(low_parallelism_stages)
     
-    # 新しいシャッフル評価ロジック：時間・I/O比率ベース
+    # 累積時間ベースのシャッフル評価ロジック
     shuffle_impact_ratio = 0
     if shuffle_nodes:
-        # 時間比率とI/O比率の最大値を使用
+        # 累積時間比率とI/O比率の最大値を使用
         time_ratio = indicators.get('shuffle_time_ratio', 0)
         io_ratio = indicators.get('shuffle_io_ratio', 0)
         shuffle_impact_ratio = max(time_ratio, io_ratio)
     
     indicators['shuffle_impact_ratio'] = shuffle_impact_ratio
     
-    # 新しい評価基準に基づくボトルネック判定
-    if shuffle_impact_ratio >= 0.4:
+    # 累積時間ベースの評価基準に基づくボトルネック判定
+    if shuffle_impact_ratio >= 0.3:  # 30%以上 = 重大なボトルネック
         indicators['shuffle_optimization_priority'] = 'high'  # 最適化を本格検討
         indicators['has_shuffle_bottleneck'] = True
-    elif shuffle_impact_ratio >= 0.2:
+    elif shuffle_impact_ratio >= 0.15:  # 15%以上 = 中程度のボトルネック
         indicators['shuffle_optimization_priority'] = 'medium'  # 軽いチューニングを検討
         indicators['has_shuffle_bottleneck'] = True
     else:
@@ -2688,9 +2688,28 @@ def calculate_bottleneck_indicators(metrics: Dict[str, Any]) -> Dict[str, Any]:
     
     # シャッフルの詳細情報
     if shuffle_nodes:
-        total_shuffle_time = sum(s['duration_ms'] for s in shuffle_nodes)
-        indicators['total_shuffle_time_ms'] = total_shuffle_time
-        indicators['shuffle_time_ratio'] = total_shuffle_time / max(total_time, 1)
+        # 累積時間ベースでの計算（並列実行を考慮）
+        total_shuffle_cumulative_time = 0
+        total_cumulative_time = 0
+        
+        # 全ノードの累積時間を計算
+        for node_metric in metrics.get('node_metrics', []):
+            node_cumulative_time = 0
+            if 'metrics' in node_metric:
+                for metric in node_metric['metrics']:
+                    if metric.get('name') == 'Cumulative time' and metric.get('value'):
+                        node_cumulative_time = metric['value']
+                        total_cumulative_time += node_cumulative_time
+                        break
+            
+            # シャッフルノードの場合は累積
+            node_name = node_metric.get('name', '').upper()
+            if any(keyword in node_name for keyword in ['SHUFFLE', 'EXCHANGE']):
+                total_shuffle_cumulative_time += node_cumulative_time
+        
+        indicators['total_shuffle_time_ms'] = total_shuffle_cumulative_time
+        # 累積時間同士で比較（並列実行における正しい影響度計算）
+        indicators['shuffle_time_ratio'] = total_shuffle_cumulative_time / max(total_cumulative_time, 1) if total_cumulative_time > 0 else 0
         
         # シャッフル操作のI/O情報を集計
         total_shuffle_io_bytes = 0
