@@ -2673,11 +2673,11 @@ def calculate_bottleneck_indicators(metrics: Dict[str, Any]) -> Dict[str, Any]:
     
     indicators['shuffle_impact_ratio'] = shuffle_impact_ratio
     
-    # 累積時間ベースの評価基準に基づくボトルネック判定
-    if shuffle_impact_ratio >= 0.3:  # 30%以上 = 重大なボトルネック
+    # Tasks total timeベースの評価基準に基づくボトルネック判定
+    if shuffle_impact_ratio >= 0.4:  # 40%以上 = 重大なボトルネック
         indicators['shuffle_optimization_priority'] = 'high'  # 最適化を本格検討
         indicators['has_shuffle_bottleneck'] = True
-    elif shuffle_impact_ratio >= 0.15:  # 15%以上 = 中程度のボトルネック
+    elif shuffle_impact_ratio >= 0.2:  # 20%以上 = 中程度のボトルネック
         indicators['shuffle_optimization_priority'] = 'medium'  # 軽いチューニングを検討
         indicators['has_shuffle_bottleneck'] = True
     else:
@@ -2688,33 +2688,20 @@ def calculate_bottleneck_indicators(metrics: Dict[str, Any]) -> Dict[str, Any]:
     
     # シャッフルの詳細情報
     if shuffle_nodes:
-        # 累積時間ベースでの計算（並列実行を考慮）
-        total_shuffle_cumulative_time = 0
-        total_cumulative_time = 0
+        # シャッフル時間の合計（keyMetricsのdurationMsを使用）
+        total_shuffle_time = sum(s['duration_ms'] for s in shuffle_nodes)
+        indicators['total_shuffle_time_ms'] = total_shuffle_time
         
-        # 全ノードの累積時間を計算（重複を避けて各ノードの代表値を使用）
-        for node_metric in metrics.get('node_metrics', []):
-            node_cumulative_times = []
-            if 'metrics' in node_metric:
-                # 1つのノードの全てのCumulative timeを収集
-                for metric in node_metric['metrics']:
-                    if metric.get('name') == 'Cumulative time' and metric.get('value'):
-                        node_cumulative_times.append(metric['value'])
-            
-            # ノードの代表累積時間を決定（Source/Sink重複を避ける）
-            if node_cumulative_times:
-                # 複数ある場合は最大値を使用（より包括的な時間）
-                representative_time = max(node_cumulative_times)
-                total_cumulative_time += representative_time
-                
-                # シャッフルノードの場合は累積
-                node_name = node_metric.get('name', '').upper()
-                if any(keyword in node_name for keyword in ['SHUFFLE', 'EXCHANGE']):
-                    total_shuffle_cumulative_time += representative_time
+        # Tasks total timeを基準とした影響度計算
+        # overall_metricsから全タスクの累積実行時間を取得
+        tasks_total_time_ms = overall.get('task_total_time_ms', 0)
         
-        indicators['total_shuffle_time_ms'] = total_shuffle_cumulative_time
-        # 累積時間同士で比較（並列実行における正しい影響度計算）
-        indicators['shuffle_time_ratio'] = total_shuffle_cumulative_time / max(total_cumulative_time, 1) if total_cumulative_time > 0 else 0
+        # Tasks total timeが取得できない場合のフォールバック
+        if tasks_total_time_ms <= 0:
+            # クエリ全体の実行時間を基準として使用
+            tasks_total_time_ms = max(total_time, 1)
+        
+        indicators['shuffle_time_ratio'] = total_shuffle_time / tasks_total_time_ms
         
         # シャッフル操作のI/O情報を集計
         total_shuffle_io_bytes = 0
