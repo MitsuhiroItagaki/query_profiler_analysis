@@ -8840,7 +8840,6 @@ FROM table1 cs
 ## 期待効果  
 [実行時間・メモリ・スピル改善の見込み（JOIN最適化効果を含む）]
 """)
-"""
 
     # 設定されたLLMプロバイダーを使用
     provider = LLM_CONFIG["provider"]
@@ -8928,7 +8927,7 @@ FROM table1 cs
 def generate_top10_time_consuming_processes_report(extracted_metrics: Dict[str, Any], limit_nodes: int = 10) -> str:
     """
     最も時間がかかっている処理のレポートを文字列として生成
-    
+
     🚨 重要: パーセンテージ計算デグレ防止
     - 並列実行ノードの時間合計を全体時間として使用することは絶対に禁止
     - overall_metrics.total_time_ms（wall-clock time）を優先使用
@@ -12713,6 +12712,7 @@ def generate_improved_query_for_performance_degradation(original_query: str, ana
 You are a Databricks SQL performance optimization expert.
 
 Performance degradation occurred in the previous optimization. Please perform **fundamental improvements** based on the degradation cause analysis.
+"""
     else:
         performance_improvement_prompt = f"""
 あなたはDatabricksのSQLパフォーマンス最適化の専門家です。
@@ -12809,7 +12809,6 @@ Performance degradation occurred in the previous optimization. Please perform **
 ## 改善詳細
 [悪化原因の解決方法と期待される性能改善の説明]
 """)
-"""
 
     # 設定されたLLMプロバイダーを使用
     provider = LLM_CONFIG["provider"]
@@ -12934,6 +12933,7 @@ def generate_optimized_query_with_error_feedback(original_query: str, analysis_r
 You are a Databricks SQL performance optimization and error correction expert.
 
 An error occurred during EXPLAIN execution of the following optimized query. Please correct based on the error information **while preserving optimization elements**.
+"""
     else:
         error_feedback_prompt = f"""
 あなたはDatabricksのSQLパフォーマンス最適化とエラー修正の専門家です。
@@ -13100,7 +13100,6 @@ FROM store_sales ss
 ## 修正詳細
 [エラーの原因と修正方法、および最適化要素保持の説明]
 """)
-"""
 
     # 設定されたLLMプロバイダーを使用
     provider = LLM_CONFIG["provider"]
@@ -13158,7 +13157,7 @@ FROM store_sales ss
 def parse_partitioning_columns(columns_string):
     """
     パーティショニングカラム文字列を解析
-    
+
     例:
     - "r_uid#206698" → ['r_uid#206698']
     - "column1, column2, column3" → ['column1', 'column2', 'column3']  
