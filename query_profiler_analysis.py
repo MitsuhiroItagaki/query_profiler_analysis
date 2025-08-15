@@ -518,16 +518,17 @@ def load_table_analysis_content() -> str:
 
 # COMMAND ----------
 
-def save_debug_query_trial(query: str, attempt_num: int, trial_type: str, query_id: str = None, error_info: str = None) -> str:
+def save_debug_query_trial(query: str, attempt_num: int, trial_type: str, query_id: str = None, error_info: str = None, retry_num: int = None) -> str:
     """
     Save queries under optimization attempt by attempt when DEBUG_ENABLED=Y
     
     Args:
         query: Generated query
         attempt_num: Trial number (1, 2, 3, ...)
-        trial_type: Trial type ('initial', 'performance_improvement', 'error_correction')
+        trial_type: Trial type ('initial', 'performance_improvement', 'error_correction', 'retry_error_correction')
         query_id: Query ID (optional)
         error_info: Error information (optional)
+        retry_num: Retry number for retry_error_correction (optional)
     
     Returns:
         Saved file path (empty string if not saved)
@@ -544,13 +545,17 @@ def save_debug_query_trial(query: str, attempt_num: int, trial_type: str, query_
         if not query_id:
             query_id = f"trial_{attempt_num}"
         
-        # Generate filename: debug_trial_{attempt_num}_{trial_type}_{timestamp}.txt
-        filename = f"{OUTPUT_FILE_DIR}/debug_trial_{attempt_num:02d}_{trial_type}_{timestamp}.txt"
+        # Generate filename: debug_trial_{attempt_num}_{trial_type}[retry_num]_{timestamp}.txt
+        if trial_type == "retry_error_correction" and retry_num is not None:
+            filename = f"{OUTPUT_FILE_DIR}/debug_trial_{attempt_num:02d}_{trial_type}{retry_num}_{timestamp}.txt"
+        else:
+            filename = f"{OUTPUT_FILE_DIR}/debug_trial_{attempt_num:02d}_{trial_type}_{timestamp}.txt"
         
         # Prepare metadata information
+        retry_info = f" (retry #{retry_num})" if trial_type == "retry_error_correction" and retry_num is not None else ""
         metadata_header = f"""-- 🐛 DEBUG: Optimization trial query (DEBUG_ENABLED=Y)
 -- 📋 Trial number: {attempt_num}
--- 🎯 Trial type: {trial_type}
+-- 🎯 Trial type: {trial_type}{retry_info}
 -- 🕐 Generated time: {timestamp}
 -- 🔍 Query ID: {query_id}
 """
@@ -15875,9 +15880,10 @@ def execute_explain_with_retry_logic(original_query: str, analysis_result: str, 
             
             # 🐛 DEBUG: 再試行時のエラー修正クエリを保存
             if isinstance(corrected_query, str) and not corrected_query.startswith("LLM_ERROR:"):
-                save_debug_query_trial(corrected_query, retry_count + 1, "retry_error_correction", 
+                save_debug_query_trial(corrected_query, current_attempt_num, "retry_error_correction", 
                                      query_id=f"retry_{retry_count + 1}", 
-                                     error_info=f"再試行{retry_count + 1}のエラー修正: {error_message[:100]}")
+                                     error_info=f"再試行{retry_count + 1}のエラー修正: {error_message[:100]}",
+                                     retry_num=retry_count + 1)
             
             # LLMエラーチェック（エラー修正時）
             if isinstance(corrected_query, str) and corrected_query.startswith("LLM_ERROR:"):
