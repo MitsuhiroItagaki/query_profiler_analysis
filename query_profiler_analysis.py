@@ -2484,6 +2484,8 @@ def calculate_bottleneck_indicators(metrics: Dict[str, Any]) -> Dict[str, Any]:
     indicators = {}
     
     overall = metrics.get('overall_metrics', {})
+    # Ensure compatibility - alias for any code that might use overall_metrics directly
+    overall_metrics = overall
     total_time = overall.get('total_time_ms', 0)
     execution_time = overall.get('execution_time_ms', 0)
     compilation_time = overall.get('compilation_time_ms', 0)
