@@ -64,8 +64,19 @@
 
 # Notebook environment file path configuration (please select from the following options)
 
-# Option 1: Pre-tuning plan file (recommended)
-JSON_FILE_PATH = '/workspace/query-profile_01f078dc-e054-132c-9ea0-325160b677c7.json'
+# SQLProfiler JSON file (required)
+JSON_FILE_PATH = '/Workspace/Shared/AutoSQLTuning/query-profile_01f078e6-dc5c-1a82-902a-652166ae2162.json'
+
+# Output file directory (required)
+OUTPUT_FILE_DIR = './'
+
+# Ensure output directory exists
+import os
+if not os.path.exists(OUTPUT_FILE_DIR):
+    os.makedirs(OUTPUT_FILE_DIR, exist_ok=True)
+    print(f"📁 Created output directory: {OUTPUT_FILE_DIR}")
+else:
+    print(f"📁 Using output directory: {OUTPUT_FILE_DIR}")
 
 # 🗂️ Catalog and database configuration (used when executing EXPLAIN statements)
 CATALOG = 'tpcds'
@@ -534,7 +545,7 @@ def save_debug_query_trial(query: str, attempt_num: int, trial_type: str, query_
             query_id = f"trial_{attempt_num}"
         
         # Generate filename: debug_trial_{attempt_num}_{trial_type}_{timestamp}.txt
-        filename = f"debug_trial_{attempt_num:02d}_{trial_type}_{timestamp}.txt"
+        filename = f"{OUTPUT_FILE_DIR}/debug_trial_{attempt_num:02d}_{trial_type}_{timestamp}.txt"
         
         # Prepare metadata information
         metadata_header = f"""-- 🐛 DEBUG: Optimization trial query (DEBUG_ENABLED=Y)
@@ -5151,7 +5162,7 @@ if not os.path.exists(JSON_FILE_PATH):
         _guidelines_text = get_liquid_clustering_guidelines()
         from datetime import datetime as _dt
         _ts = _dt.now().strftime("%Y%m%d_%H%M%S")
-        _guidelines_path = f"output_liquid_clustering_guidelines_{_ts}.md"
+        _guidelines_path = f"{OUTPUT_FILE_DIR}/output_liquid_clustering_guidelines_{_ts}.md"
         with open(_guidelines_path, "w", encoding="utf-8") as _gf:
             _gf.write(_guidelines_text + "\n")
         print(f"💾 Guidelines saved (pre-flight): {_guidelines_path}")
@@ -6199,7 +6210,7 @@ print("\n" + guidelines_text)
 try:
     from datetime import datetime as _dt
     _ts = _dt.now().strftime("%Y%m%d_%H%M%S")
-    _guidelines_path = f"output_liquid_clustering_guidelines_{_ts}.md"
+    _guidelines_path = f"{OUTPUT_FILE_DIR}/output_liquid_clustering_guidelines_{_ts}.md"
     with open(_guidelines_path, 'w', encoding='utf-8') as _gf:
         _gf.write(guidelines_text + "\n")
     print(f"💾 Guidelines saved: {_guidelines_path}")
@@ -7873,7 +7884,7 @@ def generate_optimized_query_with_llm(original_query: str, analysis_result: str,
                                 timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
                                 
                                 # Save structured results
-                                structured_plan_filename = f"output_physical_plan_structured_{timestamp}.json"
+                                structured_plan_filename = f"{OUTPUT_FILE_DIR}/output_physical_plan_structured_{timestamp}.json"
                                 with open(structured_plan_filename, 'w', encoding='utf-8') as f:
                                     f.write(physical_plan)
                                 
@@ -7963,7 +7974,7 @@ def generate_optimized_query_with_llm(original_query: str, analysis_result: str,
                         try:
                             from datetime import datetime
                             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-                            extracted_stats_filename = f"output_explain_cost_statistics_extracted_{timestamp}.json"
+                            extracted_stats_filename = f"{OUTPUT_FILE_DIR}/output_explain_cost_statistics_extracted_{timestamp}.json"
                             
                             with open(extracted_stats_filename, 'w', encoding='utf-8') as f:
                                 f.write(f"# Extracted EXPLAIN COST statistical information (Generated date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')})\n")
@@ -7985,7 +7996,7 @@ def generate_optimized_query_with_llm(original_query: str, analysis_result: str,
                             try:
                                 from datetime import datetime
                                 timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-                                full_stats_filename = f"output_explain_cost_statistics_full_{timestamp}.txt"
+                                full_stats_filename = f"{OUTPUT_FILE_DIR}/output_explain_cost_statistics_full_{timestamp}.txt"
                                 
                                 with open(full_stats_filename, 'w', encoding='utf-8') as f:
                                     f.write(f"# Complete EXPLAIN COST statistical information (Generated date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')})\n")
@@ -9643,7 +9654,7 @@ def summarize_explain_results_with_llm(explain_content: str, explain_cost_conten
             try:
                 from datetime import datetime
                 timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-                summary_filename = f"output_explain_summary_{query_type}_{timestamp}.md"
+                summary_filename = f"{OUTPUT_FILE_DIR}/output_explain_summary_{query_type}_{timestamp}.md"
                 
                 # 要約結果をMarkdown形式で保存（OUTPUT_LANGUAGEに応じて言語を切り替え）
                 output_language = globals().get('OUTPUT_LANGUAGE', 'ja')
@@ -12030,7 +12041,7 @@ def save_optimized_sql_files(original_query: str, optimized_result: str, metrics
     original_filename = None
     
     # 最適化されたクエリの抽出と保存（改善版：強化されたSQL抽出を使用）
-    optimized_filename = f"output_optimized_query_{timestamp}.sql"
+    optimized_filename = f"{OUTPUT_FILE_DIR}/output_optimized_query_{timestamp}.sql"
     
     # 改善されたSQL抽出関数を使用
     optimized_sql = extract_sql_from_llm_response(optimized_result_main_content)
@@ -12086,7 +12097,7 @@ def save_optimized_sql_files(original_query: str, optimized_result: str, metrics
     # Save analysis report file (readable report refined by LLM)
     # Generate filename based on OUTPUT_LANGUAGE setting
     language_suffix = 'en' if OUTPUT_LANGUAGE == 'en' else 'jp'
-    report_filename = f"output_optimization_report_{language_suffix}_{timestamp}.md"
+    report_filename = f"{OUTPUT_FILE_DIR}/output_optimization_report_{language_suffix}_{timestamp}.md"
     
     print("🤖 Executing LLM report refinement...")
     
@@ -12205,7 +12216,7 @@ OPTIMIZE tpcds.tpcds_sf10000_delta_lc.catalog_sales FULL;
     # 💾 ガイドラインを常に個別ファイルとしても保存
     try:
         _guidelines_text = get_liquid_clustering_guidelines()
-        _guidelines_path = f"output_liquid_clustering_guidelines_{timestamp}.md"
+        _guidelines_path = f"{OUTPUT_FILE_DIR}/output_liquid_clustering_guidelines_{timestamp}.md"
         with open(_guidelines_path, 'w', encoding='utf-8') as _gf:
             _gf.write(_guidelines_text + "\n")
         print(f"💾 Guidelines saved: {_guidelines_path}")
@@ -12352,7 +12363,7 @@ from datetime import datetime
 
 # タイムスタンプ付きファイル名を生成
 timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-original_query_filename = f"output_original_query_{timestamp}.sql"
+original_query_filename = f"{OUTPUT_FILE_DIR}/output_original_query_{timestamp}.sql"
 
 try:
     # カタログとデータベース設定の取得
@@ -13613,7 +13624,7 @@ def comprehensive_performance_judgment(original_metrics, optimized_metrics):
     try:
         from datetime import datetime
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        log_filename = f"output_performance_judgment_log_{timestamp}.txt"
+        log_filename = f"{OUTPUT_FILE_DIR}/output_performance_judgment_log_{timestamp}.txt"
         
         # 判定対象クエリを取得（グローバル変数 + 直近の保存ファイルから常に両方参照して最新・完全な内容を使用）
         original_query_text = ""
@@ -14081,7 +14092,7 @@ def compare_query_performance(original_explain_cost: str, optimized_explain_cost
             try:
                 from datetime import datetime
                 timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-                filename = f"debug_intermediate_performance_{stage}_{timestamp}.json"
+                filename = f"{OUTPUT_FILE_DIR}/debug_intermediate_performance_{stage}_{timestamp}.json"
                 
                 import json
                 with open(filename, 'w', encoding='utf-8') as f:
@@ -14472,7 +14483,7 @@ Full Traceback:
         if globals().get('ENHANCED_ERROR_HANDLING', 'N').upper() == 'Y':
             try:
                 from datetime import datetime
-                debug_filename = f"debug_performance_comparison_error_{datetime.now().strftime('%Y%m%d-%H%M%S')}.log"
+                debug_filename = f"{OUTPUT_FILE_DIR}/debug_performance_comparison_error_{datetime.now().strftime('%Y%m%d-%H%M%S')}.log"
                 with open(debug_filename, 'w', encoding='utf-8') as f:
                     f.write(debug_log)
                 print(f"🐛 Enhanced error debug log saved: {debug_filename}")
@@ -15553,7 +15564,7 @@ def execute_explain_with_retry_logic(original_query: str, analysis_result: str, 
                 
                 # 失敗時のログ記録
                 timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-                log_filename = f"output_optimization_failure_log_{timestamp}.txt"
+                log_filename = f"{OUTPUT_FILE_DIR}/output_optimization_failure_log_{timestamp}.txt"
                 
                 try:
                     with open(log_filename, 'w', encoding='utf-8') as f:
@@ -15851,8 +15862,8 @@ def execute_explain_and_save_to_file(original_query: str, query_type: str = "ori
     # ファイル名の生成（EXPLAIN_ENABLED=Yの場合のみ）
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     if explain_enabled.upper() == 'Y':
-        explain_filename = f"output_explain_{query_type}_{timestamp}.txt"
-        explain_cost_filename = f"output_explain_cost_{query_type}_{timestamp}.txt"
+        explain_filename = f"{OUTPUT_FILE_DIR}/output_explain_{query_type}_{timestamp}.txt"
+        explain_cost_filename = f"{OUTPUT_FILE_DIR}/output_explain_cost_{query_type}_{timestamp}.txt"
     else:
         explain_filename = None
         explain_cost_filename = None
@@ -15991,7 +16002,7 @@ def execute_explain_and_save_to_file(original_query: str, query_type: str = "ori
             error_cost_filename = None
             if explain_enabled.upper() == 'Y':
                 # EXPLAIN結果エラーファイル
-                error_filename = f"output_explain_error_{query_type}_{timestamp}.txt"
+                error_filename = f"{OUTPUT_FILE_DIR}/output_explain_error_{query_type}_{timestamp}.txt"
                 with open(error_filename, 'w', encoding='utf-8') as f:
                     f.write(f"# EXPLAIN実行エラー ({query_type}クエリ)\n")
                     f.write(f"実行日時: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
@@ -16163,7 +16174,7 @@ def execute_explain_and_save_to_file(original_query: str, query_type: str = "ori
             
             # エラーファイルの保存（EXPLAIN_ENABLED=Yの場合のみ）
             if explain_enabled.upper() == 'Y':
-                error_filename = f"output_explain_fatal_error_{query_type}_{timestamp}.txt"
+                error_filename = f"{OUTPUT_FILE_DIR}/output_explain_fatal_error_{query_type}_{timestamp}.txt"
                 try:
                     with open(error_filename, 'w', encoding='utf-8') as f:
                         f.write(f"# FATAL EXPLAIN実行エラー (回復不可能, {query_type}クエリ)\n")
@@ -16198,7 +16209,7 @@ def execute_explain_and_save_to_file(original_query: str, query_type: str = "ori
         # 非致命的なエラーの場合の処理
         error_filename = None
         if explain_enabled.upper() == 'Y':
-            error_filename = f"output_explain_error_{query_type}_{timestamp}.txt"
+            error_filename = f"{OUTPUT_FILE_DIR}/output_explain_error_{query_type}_{timestamp}.txt"
             try:
                 with open(error_filename, 'w', encoding='utf-8') as f:
                     f.write(f"# EXPLAIN実行エラー ({query_type}クエリ)\n")
@@ -16681,7 +16692,7 @@ try:
             from datetime import datetime
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             language_suffix = 'en' if OUTPUT_LANGUAGE == 'en' else 'jp'
-            shuffle_report_filename = f"output_enhanced_shuffle_analysis_{language_suffix}_{timestamp}.md"
+            shuffle_report_filename = f"{OUTPUT_FILE_DIR}/output_enhanced_shuffle_analysis_{language_suffix}_{timestamp}.md"
             
             with open(shuffle_report_filename, 'w', encoding='utf-8') as f:
                 f.write(shuffle_report)
@@ -16999,7 +17010,7 @@ def save_refined_report(refined_content: str, original_filename: str) -> str:
     # 最終レポートのファイル名を生成（言語別対応）
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     language_suffix = 'en' if OUTPUT_LANGUAGE == 'en' else 'jp'
-    refined_filename = f"output_final_report_{language_suffix}_{timestamp}.md"
+    refined_filename = f"{OUTPUT_FILE_DIR}/output_final_report_{language_suffix}_{timestamp}.md"
     
     try:
         with open(refined_filename, 'w', encoding='utf-8') as f:
@@ -17243,23 +17254,23 @@ else:
     
     if explain_enabled.upper() == 'Y':
         # EXPLAIN結果ファイルとエラーファイルを検索（新パターン + 旧パターン）
-        original_files = glob.glob("output_explain_original_*.txt")
-        optimized_files = glob.glob("output_explain_optimized_*.txt")
-        cost_original_files = glob.glob("output_explain_cost_original_*.txt")
-        cost_optimized_files = glob.glob("output_explain_cost_optimized_*.txt")
-        error_original_files = glob.glob("output_explain_error_original_*.txt")
-        error_optimized_files = glob.glob("output_explain_error_optimized_*.txt")
+        original_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_original_*.txt")
+        optimized_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_optimized_*.txt")
+        cost_original_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_cost_original_*.txt")
+        cost_optimized_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_cost_optimized_*.txt")
+        error_original_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_error_original_*.txt")
+        error_optimized_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_error_optimized_*.txt")
         
         # 旧パターンのファイルも削除対象に含める（下位互換性）
-        old_explain_files = glob.glob("output_explain_plan_*.txt")
-        old_error_files = glob.glob("output_explain_error_*.txt")
+        old_explain_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_plan_*.txt")
+        old_error_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_error_*.txt")
         
         # 🚨 新規追加: DEBUG用の完全情報ファイルも削除対象に含める
-        full_plan_files = glob.glob("output_physical_plan_full_*.txt")
-        full_stats_files = glob.glob("output_explain_cost_statistics_full_*.txt")
-        extracted_stats_files = glob.glob("output_explain_cost_statistics_extracted_*.json")
-        structured_plan_files = glob.glob("output_physical_plan_structured_*.json")
-        structured_cost_files = glob.glob("output_explain_cost_structured_*.json")
+        full_plan_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_physical_plan_full_*.txt")
+        full_stats_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_cost_statistics_full_*.txt")
+        extracted_stats_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_cost_statistics_extracted_*.json")
+        structured_plan_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_physical_plan_structured_*.json")
+        structured_cost_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_cost_structured_*.json")
         
         all_temp_files = (original_files + optimized_files + cost_original_files + cost_optimized_files + 
                          error_original_files + error_optimized_files + old_explain_files + old_error_files +
@@ -17303,7 +17314,7 @@ try:
     _debug_enabled_final = globals().get('DEBUG_ENABLED', 'N')
     if str(_debug_enabled_final).upper() != 'Y':
         import os
-        _additional_text_files = ["optimization_points_summary.txt", "trial_logs.txt"]
+        _additional_text_files = [f"{OUTPUT_FILE_DIR}/optimization_points_summary.txt", f"{OUTPUT_FILE_DIR}/trial_logs.txt"]
         _deleted_count = 0
         for _file_path in _additional_text_files:
             try:
@@ -17317,7 +17328,7 @@ try:
         # 🚮 Also remove performance judgment logs when debug is disabled
         try:
             import glob
-            _perf_log_files = glob.glob("output_performance_judgment_log_*.txt")
+            _perf_log_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_performance_judgment_log_*.txt")
             for _file_path in _perf_log_files:
                 try:
                     if os.path.exists(_file_path):
@@ -17344,12 +17355,9 @@ try:
         import glob
         import os
         for _pattern in (
-            "liquid_clustering_analysis_*.md",
-            "/workspace/liquid_clustering_analysis_*.md",
-            "output_liquid_clustering_guidelines_*.md",
-            "/workspace/output_liquid_clustering_guidelines_*.md",
-            "output_enhanced_shuffle_analysis_*.md",
-            "/workspace/output_enhanced_shuffle_analysis_*.md",
+            f"{OUTPUT_FILE_DIR}/liquid_clustering_analysis_*.md",
+            f"{OUTPUT_FILE_DIR}/output_liquid_clustering_guidelines_*.md",
+            f"{OUTPUT_FILE_DIR}/output_enhanced_shuffle_analysis_*.md",
         ):
             for _md in glob.glob(_pattern):
                 try:
