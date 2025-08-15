@@ -16736,22 +16736,12 @@ def find_latest_report_file() -> str:
     pattern = f"output_optimization_report_{language_suffix}_*.md"
     report_files = glob.glob(pattern)
     
-    if report_files:
-        # 最新のファイルを取得（タイムスタンプ順）
-        latest_file = max(report_files, key=os.path.getctime)
-        return latest_file
+    if not report_files:
+        return None
     
-    # メインレポートが見つからない場合、Enhanced Shuffle分析レポートを探す
-    shuffle_pattern = f"output_enhanced_shuffle_analysis_{language_suffix}_*.md"
-    shuffle_files = glob.glob(shuffle_pattern)
-    
-    if shuffle_files:
-        # 最新のShuffle分析ファイルを取得（タイムスタンプ順）
-        latest_shuffle_file = max(shuffle_files, key=os.path.getctime)
-        print(f"🔧 Using Enhanced Shuffle Analysis Report as main report: {latest_shuffle_file}")
-        return latest_shuffle_file
-    
-    return None
+    # 最新のファイルを取得（タイムスタンプ順）
+    latest_file = max(report_files, key=os.path.getctime)
+    return latest_file
 
 def find_latest_shuffle_analysis_file() -> str:
     """Find the latest enhanced shuffle analysis file"""
@@ -17115,6 +17105,16 @@ try:
         if not sql_files and not original_files:
             print("   🚨 Important: Cell 43 processing may not have been executed at all")
             print("   📋 Solution: Re-execute Cell 43 from the beginning")
+        
+        # 🚨 エラーで異常終了
+        print("\n🚨 CRITICAL ERROR: Main optimization report is required but not found")
+        print("📋 Cannot proceed with incomplete report generation")
+        print("⚠️ This indicates that the main analysis processing did not complete successfully")
+        print("💡 Please re-run the main analysis cells to generate the required report files")
+        
+        # システム終了
+        import sys
+        sys.exit(1)
     else:
         print(f"📄 Target report file: {latest_report}")
         
@@ -17125,31 +17125,25 @@ try:
         print(f"📊 Original report size: {len(original_content):,} characters")
         
         # 🔧 Enhanced Shuffle分析ファイルの統合処理
-        # ただし、メインレポートが既にEnhanced Shuffle分析レポートの場合はスキップ
-        is_shuffle_as_main = "output_enhanced_shuffle_analysis" in latest_report
-        
-        if not is_shuffle_as_main:
-            shuffle_analysis_file = find_latest_shuffle_analysis_file()
-            if shuffle_analysis_file:
-                print(f"🔧 Found Enhanced Shuffle Analysis file: {shuffle_analysis_file}")
-                try:
-                    with open(shuffle_analysis_file, 'r', encoding='utf-8') as f:
-                        shuffle_content = f.read()
-                    
-                    print(f"📊 Shuffle analysis size: {len(shuffle_content):,} characters")
-                    
-                    # Shuffle分析を主レポートに統合
-                    original_content = combine_reports_with_shuffle_analysis(original_content, shuffle_content)
-                    print(f"✅ Enhanced Shuffle Analysis integrated into main report")
-                    print(f"📊 Combined report size: {len(original_content):,} characters")
-                    
-                except Exception as e:
-                    print(f"⚠️ Error reading shuffle analysis file: {str(e)}")
-                    print("📋 Proceeding with main report only")
-            else:
-                print("ℹ️ No Enhanced Shuffle Analysis file found - proceeding with main report only")
+        shuffle_analysis_file = find_latest_shuffle_analysis_file()
+        if shuffle_analysis_file:
+            print(f"🔧 Found Enhanced Shuffle Analysis file: {shuffle_analysis_file}")
+            try:
+                with open(shuffle_analysis_file, 'r', encoding='utf-8') as f:
+                    shuffle_content = f.read()
+                
+                print(f"📊 Shuffle analysis size: {len(shuffle_content):,} characters")
+                
+                # Shuffle分析を主レポートに統合
+                original_content = combine_reports_with_shuffle_analysis(original_content, shuffle_content)
+                print(f"✅ Enhanced Shuffle Analysis integrated into main report")
+                print(f"📊 Combined report size: {len(original_content):,} characters")
+                
+            except Exception as e:
+                print(f"⚠️ Error reading shuffle analysis file: {str(e)}")
+                print("📋 Proceeding with main report only")
         else:
-            print("ℹ️ Main report is already an Enhanced Shuffle Analysis report - skipping integration")
+            print("ℹ️ No Enhanced Shuffle Analysis file found - proceeding with main report only")
         
         # 🚨 重複推敲防止: 既に推敲済みかチェック
         refinement_indicators = [
