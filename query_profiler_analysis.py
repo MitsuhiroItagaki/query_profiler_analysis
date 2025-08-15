@@ -2660,7 +2660,28 @@ def calculate_bottleneck_indicators(metrics: Dict[str, Any]) -> Dict[str, Any]:
     
     indicators['shuffle_operations_count'] = len(shuffle_nodes)
     indicators['low_parallelism_stages_count'] = len(low_parallelism_stages)
-    indicators['has_shuffle_bottleneck'] = len(shuffle_nodes) > 0 and any(s['duration_ms'] > 10000 for s in shuffle_nodes)
+    
+    # 新しいシャッフル評価ロジック：時間・I/O比率ベース
+    shuffle_impact_ratio = 0
+    if shuffle_nodes:
+        # 時間比率とI/O比率の最大値を使用
+        time_ratio = indicators.get('shuffle_time_ratio', 0)
+        io_ratio = indicators.get('shuffle_io_ratio', 0)
+        shuffle_impact_ratio = max(time_ratio, io_ratio)
+    
+    indicators['shuffle_impact_ratio'] = shuffle_impact_ratio
+    
+    # 新しい評価基準に基づくボトルネック判定
+    if shuffle_impact_ratio >= 0.4:
+        indicators['shuffle_optimization_priority'] = 'high'  # 最適化を本格検討
+        indicators['has_shuffle_bottleneck'] = True
+    elif shuffle_impact_ratio >= 0.2:
+        indicators['shuffle_optimization_priority'] = 'medium'  # 軽いチューニングを検討
+        indicators['has_shuffle_bottleneck'] = True
+    else:
+        indicators['shuffle_optimization_priority'] = 'low'  # 他のボトルネックを優先
+        indicators['has_shuffle_bottleneck'] = False
+    
     indicators['has_low_parallelism'] = len(low_parallelism_stages) > 0
     
     # シャッフルの詳細情報
@@ -2668,6 +2689,24 @@ def calculate_bottleneck_indicators(metrics: Dict[str, Any]) -> Dict[str, Any]:
         total_shuffle_time = sum(s['duration_ms'] for s in shuffle_nodes)
         indicators['total_shuffle_time_ms'] = total_shuffle_time
         indicators['shuffle_time_ratio'] = total_shuffle_time / max(total_time, 1)
+        
+        # シャッフル操作のI/O情報を集計
+        total_shuffle_io_bytes = 0
+        for node in shuffle_nodes:
+            # シャッフル関連のI/Oバイト数を取得（利用可能な場合）
+            if 'metrics' in node:
+                for metric in node['metrics']:
+                    if 'bytes' in metric.get('name', '').lower() and 'shuffle' in metric.get('name', '').lower():
+                        total_shuffle_io_bytes += metric.get('value', 0)
+        
+        indicators['total_shuffle_io_bytes'] = total_shuffle_io_bytes
+        
+        # 全体I/Oに対するシャッフルI/Oの比率
+        total_io_bytes = overall_metrics.get('read_bytes', 0) + overall_metrics.get('read_remote_bytes', 0)
+        if total_io_bytes > 0:
+            indicators['shuffle_io_ratio'] = total_shuffle_io_bytes / total_io_bytes
+        else:
+            indicators['shuffle_io_ratio'] = 0
         
         # 最も時間のかかるシャッフル操作
         slowest_shuffle = max(shuffle_nodes, key=lambda x: x['duration_ms'])
@@ -3449,7 +3488,7 @@ You are a Databricks Liquid Clustering expert. Please analyze the following SQL 
 
 【現在のボトルネック指標】
 - スピル発生: {'あり' if bottleneck_indicators.get('has_spill', False) else 'なし'}
-- シャッフル操作: {bottleneck_indicators.get('shuffle_operations_count', 0)}回
+- シャッフル影響度: {bottleneck_indicators.get('shuffle_impact_ratio', 0):.1%} ({bottleneck_indicators.get('shuffle_optimization_priority', 'low')})
 - 低並列度ステージ: {bottleneck_indicators.get('low_parallelism_stages_count', 0)}個
 
 【分析要求】
@@ -4524,7 +4563,18 @@ def analyze_bottlenecks_with_llm(metrics: Dict[str, Any]) -> str:
     shuffle_status = "❌ ボトルネックあり" if has_shuffle_bottleneck else "✅ 良好"
     parallelism_status = "❌ 低並列度あり" if has_low_parallelism else "✅ 適切"
     
-    report_lines.append(f"- **シャッフル操作**: {shuffle_count}回 ({shuffle_status})")
+    # シャッフル評価を時間・I/O比率ベースに変更
+    shuffle_impact_ratio = bottleneck_indicators.get('shuffle_impact_ratio', 0)
+    shuffle_priority = bottleneck_indicators.get('shuffle_optimization_priority', 'low')
+    
+    if shuffle_priority == 'high':
+        shuffle_display = f"{shuffle_impact_ratio:.1%} ❌ 最適化を本格検討"
+    elif shuffle_priority == 'medium':
+        shuffle_display = f"{shuffle_impact_ratio:.1%} ⚠️ 軽いチューニングを検討"
+    else:
+        shuffle_display = f"{shuffle_impact_ratio:.1%} ✅ 他のボトルネックを優先"
+    
+    report_lines.append(f"- **シャッフル影響度**: {shuffle_display}")
     report_lines.append(f"- **並列度**: {parallelism_status}")
     if has_low_parallelism:
         report_lines.append(f"  - 低並列度ステージ: {low_parallelism_count}個")
@@ -10532,7 +10582,7 @@ def generate_comprehensive_optimization_report(query_id: str, optimized_result: 
 | Photon利用率 | {min(overall_metrics.get('photon_utilization_ratio', 0) * 100, 100.0):.1f}% | {'✅ 良好' if overall_metrics.get('photon_utilization_ratio', 0) >= 0.8 else '⚠️ 改善必要'} |
 | キャッシュ効率 | {bottleneck_indicators.get('cache_hit_ratio', 0) * 100:.1f}% | {'✅ 良好' if bottleneck_indicators.get('cache_hit_ratio', 0) > 0.8 else '⚠️ 改善必要'} |
 | フィルタ率 | {bottleneck_indicators.get('data_selectivity', 0) * 100:.2f}% | {'✅ 良好' if bottleneck_indicators.get('data_selectivity', 0) > 0.5 else '⚠️ フィルタ条件を確認'} |
-| シャッフル操作 | {bottleneck_indicators.get('shuffle_operations_count', 0)}回 | {'✅ 良好' if bottleneck_indicators.get('shuffle_operations_count', 0) < 5 else '⚠️ 多数'} |
+| シャッフル影響度 | {bottleneck_indicators.get('shuffle_impact_ratio', 0):.1%} | {'❌ 最適化を本格検討' if bottleneck_indicators.get('shuffle_optimization_priority', 'low') == 'high' else '⚠️ 軽いチューニングを検討' if bottleneck_indicators.get('shuffle_optimization_priority', 'low') == 'medium' else '✅ 他のボトルネックを優先'} |
 | スピル発生 | {'はい' if bottleneck_indicators.get('has_spill', False) else 'いいえ'} | {'❌ 問題あり' if bottleneck_indicators.get('has_spill', False) else '✅ 良好'} |
 | スキュー検出 | {'AQEで検出・対応済' if bottleneck_indicators.get('has_skew', False) else '潜在的なスキューの可能性あり' if bottleneck_indicators.get('has_aqe_shuffle_skew_warning', False) else '未検出'} | {'🔧 AQE対応済' if bottleneck_indicators.get('has_skew', False) else '⚠️ 改善必要' if bottleneck_indicators.get('has_aqe_shuffle_skew_warning', False) else '✅ 良好'} |
 
@@ -10791,7 +10841,7 @@ def generate_comprehensive_optimization_report(query_id: str, optimized_result: 
 | Photon Utilization | {min(overall_metrics.get('photon_utilization_ratio', 0) * 100, 100.0):.1f}% | {'✅ Good' if overall_metrics.get('photon_utilization_ratio', 0) >= 0.8 else '⚠️ Needs Improvement'} |
 | Cache Efficiency | {bottleneck_indicators.get('cache_hit_ratio', 0) * 100:.1f}% | {'✅ Good' if bottleneck_indicators.get('cache_hit_ratio', 0) > 0.8 else '⚠️ Needs Improvement'} |
 | Filter Rate | {bottleneck_indicators.get('data_selectivity', 0) * 100:.2f}% | {'✅ Good' if bottleneck_indicators.get('data_selectivity', 0) > 0.5 else '⚠️ Check Filter Conditions'} |
-| Shuffle Operations | {bottleneck_indicators.get('shuffle_operations_count', 0)} times | {'✅ Good' if bottleneck_indicators.get('shuffle_operations_count', 0) < 5 else '⚠️ High'} |
+| Shuffle Impact | {bottleneck_indicators.get('shuffle_impact_ratio', 0):.1%} | {'❌ Serious Optimization Needed' if bottleneck_indicators.get('shuffle_optimization_priority', 'low') == 'high' else '⚠️ Light Tuning Recommended' if bottleneck_indicators.get('shuffle_optimization_priority', 'low') == 'medium' else '✅ Focus on Other Bottlenecks'} |
 | Spill Occurrence | {'Yes' if bottleneck_indicators.get('has_spill', False) else 'No'} | {'❌ Issues' if bottleneck_indicators.get('has_spill', False) else '✅ Good'} |
 | Skew Detection | {'AQE Detected & Handled' if bottleneck_indicators.get('has_skew', False) else 'Not Detected'} | {'🔧 AQE Handled' if bottleneck_indicators.get('has_skew', False) else '✅ Good'} |
 
