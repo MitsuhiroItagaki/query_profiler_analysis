@@ -7927,6 +7927,9 @@ def generate_optimized_query_with_llm(original_query: str, analysis_result: str,
                 print(f"⚠️ Failed to load cached EXPLAIN COST results: {str(e)}")
                 cached_cost_result = None
         
+        # Initialize cost_files variable to avoid UnboundLocalError
+        cost_files = []
+        
         # フォールバック: キャッシュが利用できない場合は従来のファイル検索
         if not cached_cost_result:
             # 2. Search for latest EXPLAIN COST result files
