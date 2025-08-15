@@ -91,13 +91,14 @@ EXPLAIN_ENABLED = 'Y'
 # 🐛 Debug mode setting (DEBUG_ENABLED: 'Y' = keep intermediate files, 'N' = keep final files only)
 DEBUG_ENABLED = 'Y'
 
-# 🚀 Iterative optimization maximum attempt count settings (MAX_OPTIMIZATION_ATTEMPTS: default 2 times)
-# Number of improvement attempts when performance degradation is detected
-# - 1st attempt: Initial optimization query generation and performance verification
-# - 2nd attempt and beyond: Corrected query generation and verification based on degradation cause analysis
+# 🚀 Iterative optimization maximum attempt count settings (MAX_OPTIMIZATION_ATTEMPTS: default 3 times)
+# 🔄 New design: Each attempt is clearly evaluated
+# - 1st attempt (initial): Initial optimization query generation and performance verification
+# - 2nd attempt (single_optimization): Refined optimization for comparison with initial
+# - 3rd attempt+ (performance_improvement): Corrected query generation based on degradation cause analysis
 # - When maximum attempts reached: Use original query
 # Note: This is a separate parameter from syntax error correction (MAX_RETRIES)
-MAX_OPTIMIZATION_ATTEMPTS = 2
+MAX_OPTIMIZATION_ATTEMPTS = 3
 
 # COMMAND ----------
 
@@ -14922,7 +14923,8 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
     """
     from datetime import datetime
     
-    print(f"\n🚀 Starting iterative optimization process (maximum {max_optimization_attempts} improvement attempts)")
+    print(f"\n🚀 Starting iterative optimization process (maximum {max_optimization_attempts} attempts)")
+    print("🔄 New design: Attempt 1=initial → Attempt 2=single_optimization → Attempt 3+=performance_improvement")
     print("🎯 Goal: Achieve 10%+ cost reduction | Select best result when maximum attempts reached")
     print("=" * 70)
     
@@ -14953,7 +14955,9 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
     corrected_original_query = globals().get('original_query_corrected', original_query)
     
     for attempt_num in range(1, max_optimization_attempts + 1):
-        print(f"\n🔄 Optimization attempt {attempt_num}/{max_optimization_attempts}")
+        # 🔄 新しい設計: Attemptタイプを明確に表示
+        attempt_type = {1: "initial", 2: "single_optimization", 3: "performance_improvement"}.get(attempt_num, "performance_improvement")
+        print(f"\n🔄 Attempt {attempt_num}/{max_optimization_attempts} ({attempt_type})")
         print("-" * 50)
         
         # 前回の試行結果に基づく修正指示を生成
@@ -14972,15 +14976,22 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                 print(f"📊 Confidence level: {degradation_analysis['confidence_level']}")
                 print(f"💡 Fix instructions: {len(degradation_analysis['fix_instructions'])} items")
         
-        # 最適化クエリ生成（初回 or 修正版）
+        # 🔄 新しい設計: 各Attemptを明確に評価対象として扱う
         if attempt_num == 1:
-            print("🤖 Initial optimization query generation")
+            print("🤖 Attempt 1: Initial optimization query generation")
             optimized_query = generate_optimized_query_with_llm(original_query, analysis_result, metrics)
-            # 🐛 DEBUG: 初回試行クエリを保存
+            # 🐛 DEBUG: Attempt 1 (initial) クエリを保存
             if isinstance(optimized_query, str) and not optimized_query.startswith("LLM_ERROR:"):
                 save_debug_query_trial(optimized_query, attempt_num, "initial")
+        elif attempt_num == 2:
+            print("🔧 Attempt 2: Single optimization refinement")
+            # 初回と同じ関数を使用するが、Attempt 2として明確に位置づけ
+            optimized_query = generate_optimized_query_with_llm(original_query, analysis_result, metrics)
+            # 🐛 DEBUG: Attempt 2 (single_optimization) クエリを保存
+            if isinstance(optimized_query, str) and not optimized_query.startswith("LLM_ERROR:"):
+                save_debug_query_trial(optimized_query, attempt_num, "single_optimization")
         else:
-            print(f"🔧 Corrected optimization query generation (attempt {attempt_num})")
+            print(f"🔧 Attempt {attempt_num}: Performance improvement based on degradation analysis")
             # 🚨 修正: パフォーマンス悪化専用関数を使用
             previous_attempt = optimization_attempts[-1] if optimization_attempts else {}
             degradation_analysis = previous_attempt.get('degradation_analysis', {})
@@ -14991,7 +15002,7 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                 degradation_analysis, 
                 previous_attempt.get('optimized_query', '')
             )
-            # 🐛 DEBUG: パフォーマンス改善試行クエリを保存
+            # 🐛 DEBUG: Attempt 3+ (performance_improvement) クエリを保存
             if isinstance(optimized_query, str) and not optimized_query.startswith("LLM_ERROR:"):
                 degradation_cause = degradation_analysis.get('primary_cause', 'パフォーマンス悪化')
                 save_debug_query_trial(optimized_query, attempt_num, "performance_improvement", 
@@ -15024,8 +15035,8 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
             pass
         
         # EXPLAIN実行と構文チェック
-        # 🔧 修正: 重複防止のため、single_optimization debug保存は初回のみ
-        save_single_opt_debug = (attempt_num == 1)
+        # 🔄 新しい設計: single_optimization debug保存は無効（既に上記で保存済み）
+        save_single_opt_debug = False
         explain_result = execute_explain_with_retry_logic(
             current_query, 
             analysis_result, 
@@ -15496,12 +15507,16 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
             'comparison_error': '💥'
         }.get(attempt['status'], '❓')
         
+        # 🔄 新しい設計: Attemptタイプを表示に含める
+        attempt_num = attempt['attempt']
+        attempt_type = {1: "initial", 2: "single_optimization", 3: "performance_improvement"}.get(attempt_num, "performance_improvement")
+        
         status_details = ""
         if 'cost_ratio' in attempt and attempt['cost_ratio'] is not None:
             cost_ratio = attempt['cost_ratio']
             status_details = f"💰 Cost ratio: {cost_ratio:.2f}x"
         
-        print(f"   {status_symbol} Attempt {i}: {attempt['status']}")
+        print(f"   {status_symbol} Attempt {i} ({attempt_type}): {attempt['status']}")
         if status_details:
             print(f"      {status_details}")
     
