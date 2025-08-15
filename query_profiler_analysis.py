@@ -4523,7 +4523,21 @@ def analyze_bottlenecks_with_llm(metrics: Dict[str, Any]) -> str:
     report_lines.append(f"| Photon Utilization | {photon_utilization:.1f}% | {'✅ Good' if photon_utilization >= 80 else '⚠️ Needs Improvement'} |")
     report_lines.append(f"| Cache Efficiency | {cache_hit_ratio:.1f}% | {'✅ Good' if cache_hit_ratio > 80 else '⚠️ Needs Improvement'} |")
     report_lines.append(f"| Filter Rate | {data_selectivity:.1f}% | {'✅ Good' if data_selectivity > 50 else '⚠️ Check Filter Conditions'} |")
-    report_lines.append(f"| Shuffle Operations | {shuffle_count} times | {'✅ Good' if shuffle_count < 5 else '⚠️ Many'} |")
+    # 影響度ベースのシャッフル評価
+    shuffle_impact_ratio = bottleneck_indicators.get('shuffle_impact_ratio', 0)
+    shuffle_priority = bottleneck_indicators.get('shuffle_optimization_priority', 'low')
+    
+    if shuffle_priority == 'high':
+        shuffle_display = f"{shuffle_impact_ratio:.1%} impact"
+        shuffle_status = "❌ Serious Optimization Needed"
+    elif shuffle_priority == 'medium':
+        shuffle_display = f"{shuffle_impact_ratio:.1%} impact"
+        shuffle_status = "⚠️ Light Tuning Recommended"
+    else:
+        shuffle_display = f"{shuffle_impact_ratio:.1%} impact"
+        shuffle_status = "✅ Focus on Other Bottlenecks"
+    
+    report_lines.append(f"| Shuffle Impact | {shuffle_display} | {shuffle_status} |")
     report_lines.append(f"| Spill Occurred | {'Yes' if has_spill else 'No'} | {'❌ Problem' if has_spill else '✅ Good'} |")
     
     # スキュー検出の判定
@@ -5338,8 +5352,21 @@ has_shuffle_bottleneck = bottleneck_indicators.get('has_shuffle_bottleneck', Fal
 has_low_parallelism = bottleneck_indicators.get('has_low_parallelism', False)
 low_parallelism_count = bottleneck_indicators.get('low_parallelism_stages_count', 0)
 
-shuffle_emoji = "🚨" if has_shuffle_bottleneck else "⚠️" if shuffle_count > 5 else "✅"
-print(f"{shuffle_emoji} Shuffle Operations: {shuffle_count} times ({'Bottleneck detected' if has_shuffle_bottleneck else 'Normal'})")
+# 新しい影響度ベースの表示
+shuffle_impact_ratio = bottleneck_indicators.get('shuffle_impact_ratio', 0)
+shuffle_priority = bottleneck_indicators.get('shuffle_optimization_priority', 'low')
+
+if shuffle_priority == 'high':
+    shuffle_emoji = "🚨"
+    shuffle_status = f"Serious optimization needed ({shuffle_impact_ratio:.1%} impact)"
+elif shuffle_priority == 'medium':
+    shuffle_emoji = "⚠️"
+    shuffle_status = f"Light tuning recommended ({shuffle_impact_ratio:.1%} impact)"
+else:
+    shuffle_emoji = "✅"
+    shuffle_status = f"Focus on other bottlenecks ({shuffle_impact_ratio:.1%} impact)"
+
+print(f"{shuffle_emoji} Shuffle Impact: {shuffle_status}")
 
 parallelism_emoji = "🚨" if has_low_parallelism else "✅"
 print(f"{parallelism_emoji} Parallelism: {'Issues detected' if has_low_parallelism else 'Appropriate'} (Low parallelism stages: {low_parallelism_count})")
