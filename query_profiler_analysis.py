@@ -65,7 +65,7 @@
 # Notebook environment file path configuration (please select from the following options)
 
 # SQLProfiler JSON file (required)
-JSON_FILE_PATH = '/Workspace/Shared/AutoSQLTuning/query-profile_01f078e6-dc5c-1a82-902a-652166ae2162.json'
+JSON_FILE_PATH = '/workspace/sample.json'
 
 # Output file directory (required)
 OUTPUT_FILE_DIR = './'
@@ -2663,30 +2663,10 @@ def calculate_bottleneck_indicators(metrics: Dict[str, Any]) -> Dict[str, Any]:
     indicators['shuffle_operations_count'] = len(shuffle_nodes)
     indicators['low_parallelism_stages_count'] = len(low_parallelism_stages)
     
-    # 累積時間ベースのシャッフル評価ロジック
-    shuffle_impact_ratio = 0
-    if shuffle_nodes:
-        # 累積時間比率とI/O比率の最大値を使用
-        time_ratio = indicators.get('shuffle_time_ratio', 0)
-        io_ratio = indicators.get('shuffle_io_ratio', 0)
-        shuffle_impact_ratio = max(time_ratio, io_ratio)
-    
-    indicators['shuffle_impact_ratio'] = shuffle_impact_ratio
-    
-    # Tasks total timeベースの評価基準に基づくボトルネック判定
-    if shuffle_impact_ratio >= 0.4:  # 40%以上 = 重大なボトルネック
-        indicators['shuffle_optimization_priority'] = 'high'  # 最適化を本格検討
-        indicators['has_shuffle_bottleneck'] = True
-    elif shuffle_impact_ratio >= 0.2:  # 20%以上 = 中程度のボトルネック
-        indicators['shuffle_optimization_priority'] = 'medium'  # 軽いチューニングを検討
-        indicators['has_shuffle_bottleneck'] = True
-    else:
-        indicators['shuffle_optimization_priority'] = 'low'  # 他のボトルネックを優先
-        indicators['has_shuffle_bottleneck'] = False
-    
     indicators['has_low_parallelism'] = len(low_parallelism_stages) > 0
     
     # シャッフルの詳細情報
+    shuffle_impact_ratio = 0
     if shuffle_nodes:
         # シャッフル時間の合計（keyMetricsのdurationMsを使用）
         total_shuffle_time = sum(s['duration_ms'] for s in shuffle_nodes)
@@ -2725,6 +2705,25 @@ def calculate_bottleneck_indicators(metrics: Dict[str, Any]) -> Dict[str, Any]:
         slowest_shuffle = max(shuffle_nodes, key=lambda x: x['duration_ms'])
         indicators['slowest_shuffle_duration_ms'] = slowest_shuffle['duration_ms']
         indicators['slowest_shuffle_node'] = slowest_shuffle['name']
+        
+        # 累積時間ベースのシャッフル評価ロジック
+        # 累積時間比率とI/O比率の最大値を使用
+        time_ratio = indicators.get('shuffle_time_ratio', 0)
+        io_ratio = indicators.get('shuffle_io_ratio', 0)
+        shuffle_impact_ratio = max(time_ratio, io_ratio)
+    
+    indicators['shuffle_impact_ratio'] = shuffle_impact_ratio
+    
+    # Tasks total timeベースの評価基準に基づくボトルネック判定
+    if shuffle_impact_ratio >= 0.4:  # 40%以上 = 重大なボトルネック
+        indicators['shuffle_optimization_priority'] = 'high'  # 最適化を本格検討
+        indicators['has_shuffle_bottleneck'] = True
+    elif shuffle_impact_ratio >= 0.2:  # 20%以上 = 中程度のボトルネック
+        indicators['shuffle_optimization_priority'] = 'medium'  # 軽いチューニングを検討
+        indicators['has_shuffle_bottleneck'] = True
+    else:
+        indicators['shuffle_optimization_priority'] = 'low'  # 他のボトルネックを優先
+        indicators['has_shuffle_bottleneck'] = False
     
     # 低並列度の詳細情報
     if low_parallelism_stages:
