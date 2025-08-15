@@ -15867,7 +15867,7 @@ def execute_explain_with_retry_logic(original_query: str, analysis_result: str, 
             
             # 再試行する場合のエラー修正
             retry_count += 1
-            print(f"🔧 Correcting error for attempt {retry_count + 1}...")
+            print(f"🔧 Correcting error for attempt {retry_count}...")
             
             # エラー情報を含めて再生成（初回最適化クエリも渡す）
             corrected_query = generate_optimized_query_with_error_feedback(
@@ -15881,9 +15881,9 @@ def execute_explain_with_retry_logic(original_query: str, analysis_result: str, 
             # 🐛 DEBUG: 再試行時のエラー修正クエリを保存
             if isinstance(corrected_query, str) and not corrected_query.startswith("LLM_ERROR:"):
                 save_debug_query_trial(corrected_query, current_attempt_num, "retry_error_correction", 
-                                     query_id=f"retry_{retry_count + 1}", 
-                                     error_info=f"再試行{retry_count + 1}のエラー修正: {error_message[:100]}",
-                                     retry_num=retry_count + 1)
+                                     query_id=f"retry_{retry_count}", 
+                                     error_info=f"再試行{retry_count}のエラー修正: {error_message[:100]}",
+                                     retry_num=retry_count)
             
             # LLMエラーチェック（エラー修正時）
             if isinstance(corrected_query, str) and corrected_query.startswith("LLM_ERROR:"):
@@ -15892,7 +15892,7 @@ def execute_explain_with_retry_logic(original_query: str, analysis_result: str, 
                 
                 # 失敗記録
                 attempt_record = {
-                    'attempt': retry_count + 1,
+                    'attempt': retry_count,
                     'status': 'llm_error_correction_failed',
                     'query': current_query,
                     'error_message': f"エラー修正時LLMエラー: {corrected_query[10:]}",
@@ -15916,7 +15916,7 @@ def execute_explain_with_retry_logic(original_query: str, analysis_result: str, 
                 return {
                     'final_status': 'llm_error_correction_failed',
                     'final_query': original_query,
-                    'total_attempts': retry_count + 1,
+                    'total_attempts': retry_count,
                     'all_attempts': all_attempts,
                     'explain_result': None,
                     'optimized_result': corrected_query,
@@ -15939,7 +15939,7 @@ def execute_explain_with_retry_logic(original_query: str, analysis_result: str, 
     return {
         'final_status': 'unexpected_error',
         'final_query': original_query,
-        'total_attempts': retry_count + 1,
+        'total_attempts': retry_count,
         'all_attempts': all_attempts
     }
 
