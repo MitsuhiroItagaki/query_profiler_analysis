@@ -8412,21 +8412,9 @@ Shuffle効率性スコア: {efficiency_rate:.1f}%
         )
     
     # Generate language-appropriate prompt header based on OUTPUT_LANGUAGE
-    if OUTPUT_LANGUAGE == 'en':
-        prompt_header = """You are a Databricks SQL performance optimization expert. Please optimize the SQL query with **processing speed focus** based on the following **detailed bottleneck analysis results**.
-
-【Important Processing Guidelines】
-- **🚨 You must provide only a single SQL query as the response**
-- **❌ Decomposing the response into multiple SQL queries is absolutely prohibited**
-- **❌ Staged multiple SQL outputs or providing multiple separate SQL statements is strictly forbidden**
-- **✅ You must always respond with one complete, integrated SQL query**
-- Generate a complete SQL query in one output
-- Staged output or multiple-stage output is prohibited
-- Thinking function for structure understanding → complete SQL output in one go
-- **❌ BROADCAST hints (/*+ BROADCAST */, /*+ BROADCAST(table) */) are strictly prohibited**
-- **✅ JOIN strategy optimization relies on Spark's automatic optimization without hints**"""
-    else:
-        prompt_header = """あなたはDatabricksのSQLパフォーマンス最適化の専門家です。以下の**詳細なボトルネック分析結果**を基に、**処理速度重視**でSQLクエリを最適化してください。
+    # 🌐 OPTIMIZATION QUALITY FIX: Always use Japanese prompts for consistent optimization quality
+    # Translation will be applied to the response when OUTPUT_LANGUAGE = 'en'
+    prompt_header = """あなたはDatabricksのSQLパフォーマンス最適化の専門家です。以下の**詳細なボトルネック分析結果**を基に、**処理速度重視**でSQLクエリを最適化してください。
 
 【重要な処理方針】
 - **🚨 必ず単体のSQLクエリのみを回答してください**
@@ -8837,12 +8825,6 @@ FROM table1 cs
 [Detailed rationale for JOIN order optimization]
 - 📏 Table size-based optimization: Efficient join order from small to large tables
 - 🎯 Optimization target tables: [table name list]
-- ⚖️ JOIN strategy: Efficient join processing utilizing Spark's automatic optimization
-- 🚀 Expected effects: [Network transfer reduction, JOIN processing acceleration, shuffle reduction, etc.]
-
-## Expected Effects  
-[Expected improvement in execution time, memory, and spill (including JOIN optimization effects)]
-""" if OUTPUT_LANGUAGE == 'en' else """
 【出力形式】
 ## 🚀 処理速度重視の最適化されたSQL
 
@@ -8971,6 +8953,18 @@ FROM table1 cs
         
         # thinking_enabled: Trueの場合にoptimized_resultがリストになることがあるため対応
         # ここでは元のレスポンス形式を保持して返す（後で用途に応じて変換）
+        
+        # 🌐 TRANSLATION FIX: Translate to English when OUTPUT_LANGUAGE = 'en'
+        # Always use Japanese prompts for optimization quality, translate output when needed
+        if OUTPUT_LANGUAGE == 'en' and isinstance(optimized_result, str):
+            try:
+                print("🌐 Translating optimization result to English (for OUTPUT_LANGUAGE = 'en')...")
+                translated_result = translate_optimization_result_to_english(optimized_result)
+                return translated_result
+            except Exception as e:
+                print(f"⚠️ Translation failed, returning original Japanese result: {str(e)}")
+                return optimized_result
+        
         return optimized_result
         
     except Exception as e:
@@ -10412,6 +10406,59 @@ def generate_performance_comparison_section(performance_comparison: Dict[str, An
 """
     
     return section
+
+def translate_optimization_result_to_english(japanese_text: str) -> str:
+    """
+    最適化結果を日本語から英語に翻訳
+    SQLクエリ部分は変更せず、説明文のみを翻訳
+    """
+    try:
+        print("🌐 Translating optimization result from Japanese to English...")
+        
+        translation_prompt = f"""
+以下のDatabricks SQL最適化結果を、技術的な正確性を保ちながら自然な英語に翻訳してください。
+SQLクエリ部分（```sql から ``` までの部分）は一切変更せず、そのまま保持してください。
+最適化手法の説明や効果分析の部分のみを英語に翻訳してください。
+
+【翻訳対象】
+{japanese_text}
+
+【翻訳要件】
+- SQLクエリ部分は絶対に変更しない（```sql から ``` までは完全に保持）
+- 技術的正確性を最優先
+- 自然で読みやすい英語
+- SQL用語は適切な英語表現を使用
+- 数値・パフォーマンス指標はそのまま保持
+- 最適化手法の説明は明確で実用的な英語で表現
+- ファイル構造とフォーマットは完全に保持
+
+英語翻訳結果のみを出力してください：
+"""
+        
+        provider = LLM_CONFIG.get("provider", "databricks")
+        
+        if provider == "databricks":
+            english_result = _call_databricks_llm(translation_prompt)
+        elif provider == "openai":
+            english_result = _call_openai_llm(translation_prompt)
+        elif provider == "azure_openai":
+            english_result = _call_azure_openai_llm(translation_prompt)
+        elif provider == "anthropic":
+            english_result = _call_anthropic_llm(translation_prompt)
+        else:
+            print("❌ Unsupported LLM provider for translation")
+            return japanese_text
+            
+        if english_result and not english_result.startswith("LLM_ERROR:"):
+            print("✅ Translation to English completed successfully")
+            return english_result
+        else:
+            print("⚠️ Translation failed, returning original Japanese result")
+            return japanese_text
+            
+    except Exception as e:
+        print(f"❌ Translation error: {str(e)}")
+        return japanese_text
 
 def translate_analysis_to_japanese(english_text: str) -> str:
     """
@@ -12780,14 +12827,8 @@ def generate_improved_query_for_performance_degradation(original_query: str, ana
 """
 
     # Language-appropriate performance improvement prompt
-    if OUTPUT_LANGUAGE == 'en':
-        performance_improvement_prompt = f"""
-You are a Databricks SQL performance optimization expert.
-
-Performance degradation occurred in the previous optimization. Please perform **fundamental improvements** based on the degradation cause analysis.
-"""
-    else:
-        performance_improvement_prompt = f"""
+    # 🌐 OPTIMIZATION QUALITY FIX: Always use Japanese prompts for consistent optimization quality
+    performance_improvement_prompt = f"""
 あなたはDatabricksのSQLパフォーマンス最適化の専門家です。
 
 前回の最適化でパフォーマンス悪化が発生しました。悪化原因分析に基づいて **根本的な改善** を行ってください。
@@ -12917,6 +12958,16 @@ Performance degradation occurred in the previous optimization. Please perform **
                     print(f"❌ Error detected in LLM performance improvement: {indicator}")
                     return f"LLM_ERROR: {improved_result}"
         
+        # 🌐 TRANSLATION FIX: Translate to English when OUTPUT_LANGUAGE = 'en'
+        if OUTPUT_LANGUAGE == 'en' and isinstance(improved_result, str):
+            try:
+                print("🌐 Translating performance improvement result to English...")
+                translated_result = translate_optimization_result_to_english(improved_result)
+                return translated_result
+            except Exception as e:
+                print(f"⚠️ Translation failed, returning original Japanese result: {str(e)}")
+                return improved_result
+        
         return improved_result
         
     except Exception as e:
@@ -13001,14 +13052,8 @@ def generate_optimized_query_with_error_feedback(original_query: str, analysis_r
     specific_guidance = generate_specific_error_guidance(error_info)
 
     # Language-appropriate error feedback prompt
-    if OUTPUT_LANGUAGE == 'en':
-        error_feedback_prompt = f"""
-You are a Databricks SQL performance optimization and error correction expert.
-
-An error occurred during EXPLAIN execution of the following optimized query. Please correct based on the error information **while preserving optimization elements**.
-"""
-    else:
-        error_feedback_prompt = f"""
+    # 🌐 OPTIMIZATION QUALITY FIX: Always use Japanese prompts for consistent optimization quality
+    error_feedback_prompt = f"""
 あなたはDatabricksのSQLパフォーマンス最適化とエラー修正の専門家です。
 
 以下の最適化クエリでEXPLAIN実行時にエラーが発生しました。**最適化要素を保持しながら**エラー情報を基に修正してください。
@@ -13217,7 +13262,28 @@ FROM store_sales ss
         if isinstance(optimized_result, str) and not optimized_result.startswith("LLM_ERROR:"):
             print("🔧 Executing query validation and post-processing after error correction")
             final_corrected_query = enhance_error_correction_with_syntax_validation(optimized_result, original_query, error_info)
+            
+            # 🌐 TRANSLATION FIX: Translate to English when OUTPUT_LANGUAGE = 'en'
+            if OUTPUT_LANGUAGE == 'en' and isinstance(final_corrected_query, str):
+                try:
+                    print("🌐 Translating error correction result to English...")
+                    translated_result = translate_optimization_result_to_english(final_corrected_query)
+                    return translated_result
+                except Exception as e:
+                    print(f"⚠️ Translation failed, returning original Japanese result: {str(e)}")
+                    return final_corrected_query
+            
             return final_corrected_query
+        
+        # 🌐 TRANSLATION FIX: Translate to English when OUTPUT_LANGUAGE = 'en'
+        if OUTPUT_LANGUAGE == 'en' and isinstance(optimized_result, str):
+            try:
+                print("🌐 Translating error correction result to English...")
+                translated_result = translate_optimization_result_to_english(optimized_result)
+                return translated_result
+            except Exception as e:
+                print(f"⚠️ Translation failed, returning original Japanese result: {str(e)}")
+                return optimized_result
         
         return optimized_result
         
