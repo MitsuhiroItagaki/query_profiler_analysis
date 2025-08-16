@@ -94,7 +94,7 @@ DEBUG_ENABLED = 'Y'
 # 🚀 Iterative optimization maximum attempt count settings (MAX_OPTIMIZATION_ATTEMPTS: default 3 times)
 # 🔄 New design: Each attempt is clearly evaluated
 # - 1st attempt (initial): Initial optimization query generation and performance verification
-# - 2nd attempt (single_optimization): Refined optimization for comparison with initial
+# - 2nd attempt (single_optimization): Refined optimization based on 1st attempt results
 # - 3rd attempt+ (performance_improvement): Corrected query generation based on degradation cause analysis
 # - When maximum attempts reached: Use original query
 # Note: This is a separate parameter from syntax error correction (MAX_RETRIES)
@@ -7953,6 +7953,157 @@ def parse_photon_explanation(photon_text: str) -> Dict[str, Any]:
     return result
 
 
+def generate_refined_query_with_previous_result(original_query: str, analysis_result: str, metrics: Dict[str, Any], previous_attempt: Dict[str, Any]) -> str:
+    """
+    試行2回目専用: 試行1回目の結果を基に改善された最適化クエリを生成
+    
+    Args:
+        original_query: 元のクエリ
+        analysis_result: ボトルネック分析結果
+        metrics: メトリクス情報
+        previous_attempt: 試行1回目の結果（performance_comparison, degradation_analysis等含む）
+    """
+    
+    # 試行1回目の結果を解析
+    previous_performance = previous_attempt.get('performance_comparison', {})
+    cost_ratio = previous_attempt.get('cost_ratio', 1.0)
+    memory_ratio = previous_attempt.get('memory_ratio', 1.0)
+    previous_query = previous_attempt.get('optimized_query', '')
+    degradation_analysis = previous_attempt.get('degradation_analysis', {})
+    attempt_status = previous_attempt.get('status', 'unknown')
+    
+    # パフォーマンス状況の判定
+    has_improvement = cost_ratio < 0.95 or memory_ratio < 0.95  # 5%以上の改善
+    has_degradation = cost_ratio > 1.05 or memory_ratio > 1.05  # 5%以上の悪化
+    
+    # 前回結果の詳細セクション
+    previous_result_section = f"""
+【📊 試行1回目の結果分析】
+- **実行コスト比**: {cost_ratio:.3f}倍 ({(cost_ratio-1)*100:+.1f}%)
+- **メモリ使用比**: {memory_ratio:.3f}倍 ({(memory_ratio-1)*100:+.1f}%)
+- **最適化状況**: {attempt_status}
+
+【💡 前回の最適化クエリ】
+```sql
+{previous_query}
+```
+"""
+    
+    # 改善指示の生成
+    if has_improvement:
+        improvement_instructions = f"""
+【🚀 改善拡大戦略】
+前回の最適化で {(1-cost_ratio)*100:.1f}% のコスト削減を達成しました。この改善を更に拡大させてください：
+
+1. **成功した最適化パターンの強化**:
+   - 前回のクエリで効果的だった最適化手法を特定し、さらに改良
+   - 同様のパフォーマンス向上が期待できる部分に追加適用
+
+2. **追加最適化ポイントの探索**:
+   - 前回では最適化されなかった部分を対象に
+   - より積極的なインデックス利用やJOIN順序最適化
+   - 更なるパーティション効率化
+
+3. **保守的安全性の確保**:
+   - 前回の改善を保持しながら段階的改善
+   - 大幅な構造変更は避けて安全性重視
+"""
+    elif has_degradation:
+        # 悪化が検出された場合は既存の悪化分析結果を活用
+        primary_cause = degradation_analysis.get('primary_cause', 'unknown')
+        fix_instructions = degradation_analysis.get('fix_instructions', [])
+        improvement_instructions = f"""
+【🔧 悪化原因修正戦略】
+前回の最適化で {(cost_ratio-1)*100:.1f}% のコスト増加が発生しました。
+
+**主要原因**: {primary_cause}
+
+**具体的修正指示**:
+{chr(10).join(f"- {instruction}" for instruction in fix_instructions)}
+
+**修正アプローチ**:
+1. 前回の問題要因を除去した保守的最適化
+2. 元のクエリ構造により近い改善案
+3. ヒントの適用を最小限に抑制
+"""
+    else:
+        improvement_instructions = f"""
+【🎯 代替アプローチ戦略】
+前回の最適化では大きな変化が見られませんでした（コスト比: {cost_ratio:.3f}）。
+異なるアプローチで最適化を試行してください：
+
+1. **異なる最適化視点**:
+   - 前回と異なるJOIN戦略の採用
+   - 別のインデックス活用パターン
+   - 異なるパーティショニング戦略
+
+2. **より積極的な最適化**:
+   - 前回より踏み込んだクエリ構造の改良
+   - より効率的なサブクエリ最適化
+   - 実行計画の根本的見直し
+
+3. **特定領域への集中**:
+   - ボトルネック分析で特定された重点問題への集中対策
+"""
+    
+    # Language-appropriate refined optimization prompt
+    refined_optimization_prompt = f"""
+あなたはDatabricksのSQLパフォーマンス最適化の専門家です。
+
+**試行1回目の結果を踏まえて、より良い最適化クエリを生成してください。**
+
+{previous_result_section}
+
+{improvement_instructions}
+
+【📋 元の分析対象クエリ】
+```sql
+{original_query}
+```
+
+【📊 ボトルネック分析結果】
+{analysis_result}
+
+【🎯 試行2回目の最適化方針】
+1. **前回結果の活用**: 試行1回目の成功・失敗パターンを学習
+2. **段階的改善**: 急激な変更を避け、確実な改善を追求
+3. **リスク管理**: パフォーマンス悪化リスクを最小化
+4. **効率性重視**: 実際の実行効率向上を優先
+
+**最適化クエリのみを出力してください（説明文は不要）：**
+"""
+
+    # LLM APIコール実行
+    import json
+    import time
+    
+    try:
+        from openai import OpenAI
+        client = OpenAI()
+        
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{
+                "role": "user", 
+                "content": refined_optimization_prompt
+            }],
+            max_tokens=4000,
+            temperature=0.3
+        )
+        
+        if response.choices:
+            optimized_query = response.choices[0].message.content
+            print(f"✅ 試行2回目の最適化クエリを生成しました")
+            return optimized_query
+        else:
+            print("⚠️ LLM response is empty")
+            return f"LLM_ERROR: No optimization suggestions generated"
+            
+    except Exception as e:
+        print(f"⚠️ LLM API call failed: {str(e)}")
+        return f"LLM_ERROR: API call failed - {str(e)}"
+
+
 def generate_optimized_query_with_llm(original_query: str, analysis_result: str, metrics: Dict[str, Any]) -> str:
     """
     Optimize SQL query based on detailed bottleneck analysis results from Cell 33 (processing speed priority)
@@ -15057,7 +15208,7 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
     from datetime import datetime
     
     print(f"\n🚀 Starting iterative optimization process (maximum {max_optimization_attempts} attempts)")
-    print("🔄 New design: Attempt 1=initial → Attempt 2=single_optimization → Attempt 3+=performance_improvement")
+    print("🔄 New design: Attempt 1=initial → Attempt 2=refined_with_previous_result → Attempt 3+=performance_improvement")
     print("🎯 Goal: Achieve 10%+ cost reduction | Select best result when maximum attempts reached")
     print("=" * 70)
     
@@ -15117,9 +15268,16 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
             if isinstance(optimized_query, str) and not optimized_query.startswith("LLM_ERROR:"):
                 save_debug_query_trial(optimized_query, attempt_num, "initial")
         elif attempt_num == 2:
-            print("🔧 Attempt 2: Single optimization refinement")
-            # 初回と同じ関数を使用するが、Attempt 2として明確に位置づけ
-            optimized_query = generate_optimized_query_with_llm(original_query, analysis_result, metrics)
+            print("🔧 Attempt 2: Single optimization refinement based on previous result")
+            # 🚀 新実装: 試行1回目の結果を活用した改善最適化
+            if optimization_attempts:
+                previous_attempt = optimization_attempts[-1]
+                optimized_query = generate_refined_query_with_previous_result(original_query, analysis_result, metrics, previous_attempt)
+                print(f"📊 Previous attempt cost ratio: {previous_attempt.get('cost_ratio', 'N/A')}")
+                print(f"📊 Previous attempt status: {previous_attempt.get('status', 'N/A')}")
+            else:
+                print("⚠️ No previous attempt found, falling back to standard optimization")
+                optimized_query = generate_optimized_query_with_llm(original_query, analysis_result, metrics)
             # 🐛 DEBUG: Attempt 2 (single_optimization) クエリを保存
             if isinstance(optimized_query, str) and not optimized_query.startswith("LLM_ERROR:"):
                 save_debug_query_trial(optimized_query, attempt_num, "single_optimization")
