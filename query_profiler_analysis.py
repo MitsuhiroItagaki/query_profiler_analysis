@@ -519,7 +519,7 @@ def load_table_analysis_content() -> str:
 
 # COMMAND ----------
 
-def save_debug_query_trial(query: str, attempt_num: int, trial_type: str, query_id: str = None, error_info: str = None, retry_num: int = None) -> str:
+def save_rewrite_query_trial(query: str, attempt_num: int, trial_type: str, query_id: str = None, error_info: str = None, retry_num: int = None) -> str:
     """
     Save queries under optimization attempt by attempt when DEBUG_ENABLED=Y
     
@@ -546,15 +546,15 @@ def save_debug_query_trial(query: str, attempt_num: int, trial_type: str, query_
         if not query_id:
             query_id = f"trial_{attempt_num}"
         
-        # Generate filename: debug_trial_{attempt_num}_{trial_type}[retry_num]_{timestamp}.txt
+        # Generate filename: rewrite_trial_{attempt_num}_{trial_type}[retry_num]_{timestamp}.txt
         if trial_type == "retry_error_correction" and retry_num is not None:
-            filename = f"{OUTPUT_FILE_DIR}/debug_trial_{attempt_num:02d}_{trial_type}{retry_num}_{timestamp}.txt"
+            filename = f"{OUTPUT_FILE_DIR}/rewrite_trial_{attempt_num:02d}_{trial_type}{retry_num}_{timestamp}.txt"
         else:
-            filename = f"{OUTPUT_FILE_DIR}/debug_trial_{attempt_num:02d}_{trial_type}_{timestamp}.txt"
+            filename = f"{OUTPUT_FILE_DIR}/rewrite_trial_{attempt_num:02d}_{trial_type}_{timestamp}.txt"
         
         # Prepare metadata information
         retry_info = f" (retry #{retry_num})" if trial_type == "retry_error_correction" and retry_num is not None else ""
-        metadata_header = f"""-- 🐛 DEBUG: Optimization trial query (DEBUG_ENABLED=Y)
+        metadata_header = f"""-- 🔧 REWRITE: Optimization trial query (DEBUG_ENABLED=Y)
 -- 📋 Trial number: {attempt_num}
 -- 🎯 Trial type: {trial_type}{retry_info}
 -- 🕐 Generated time: {timestamp}
@@ -15263,9 +15263,9 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
         if attempt_num == 1:
             print("🤖 Attempt 1: Initial optimization query generation")
             optimized_query = generate_optimized_query_with_llm(original_query, analysis_result, metrics)
-            # 🐛 DEBUG: Attempt 1 (initial) クエリを保存
+            # 🔧 REWRITE: Attempt 1 (initial) クエリを保存
             if isinstance(optimized_query, str) and not optimized_query.startswith("LLM_ERROR:"):
-                save_debug_query_trial(optimized_query, attempt_num, "initial")
+                save_rewrite_query_trial(optimized_query, attempt_num, "initial")
         elif attempt_num == 2:
             print("🔧 Attempt 2: Single optimization refinement based on previous result")
             # 🚀 新実装: 試行1回目の結果を活用した改善最適化
@@ -15277,9 +15277,9 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
             else:
                 print("⚠️ No previous attempt found, falling back to standard optimization")
                 optimized_query = generate_optimized_query_with_llm(original_query, analysis_result, metrics)
-            # 🐛 DEBUG: Attempt 2 (single_optimization) クエリを保存
+            # 🔧 REWRITE: Attempt 2 (single_optimization) クエリを保存
             if isinstance(optimized_query, str) and not optimized_query.startswith("LLM_ERROR:"):
-                save_debug_query_trial(optimized_query, attempt_num, "single_optimization")
+                save_rewrite_query_trial(optimized_query, attempt_num, "single_optimization")
         else:
             print(f"🔧 Attempt {attempt_num}: Performance improvement based on degradation analysis")
             # 🚨 修正: パフォーマンス悪化専用関数を使用
@@ -15292,10 +15292,10 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                 degradation_analysis, 
                 previous_attempt.get('optimized_query', '')
             )
-            # 🐛 DEBUG: Attempt 3+ (performance_improvement) クエリを保存
+            # 🔧 REWRITE: Attempt 3+ (performance_improvement) クエリを保存
             if isinstance(optimized_query, str) and not optimized_query.startswith("LLM_ERROR:"):
                 degradation_cause = degradation_analysis.get('primary_cause', 'パフォーマンス悪化')
-                save_debug_query_trial(optimized_query, attempt_num, "performance_improvement", 
+                save_rewrite_query_trial(optimized_query, attempt_num, "performance_improvement", 
                                      error_info=f"前回悪化原因: {degradation_cause}")
         
         # LLMエラーチェック
@@ -15311,7 +15311,7 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
             
             # デバッグファイルに保存
             try:
-                save_debug_query_trial(f"LLM_ERROR: {error_details}", attempt_num, attempt_type, 
+                save_rewrite_query_trial(f"LLM_ERROR: {error_details}", attempt_num, attempt_type, 
                                      error_info=f"LLM API failure: {error_details}")
                 print(f"   📄 Debug info saved for attempt {attempt_num}")
             except Exception as debug_save_error:
@@ -15442,9 +15442,9 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                     current_query  # 現在のクエリ（ヒント付き）を渡す
                 )
                 
-                # 🐛 DEBUG: エラー修正クエリを保存
+                # 🔧 REWRITE: エラー修正クエリを保存
                 if isinstance(corrected_query, str) and not corrected_query.startswith("LLM_ERROR:"):
-                    save_debug_query_trial(corrected_query, attempt_num, "error_correction", 
+                    save_rewrite_query_trial(corrected_query, attempt_num, "error_correction", 
                                          error_info=f"修正対象エラー: {error_message[:100]}")
                 
                 # LLMエラーチェック
@@ -15939,9 +15939,9 @@ def execute_explain_with_retry_logic(original_query: str, analysis_result: str, 
     print("🤖 Step 1: Initial optimization query generation")
     optimized_query = generate_optimized_query_with_llm(original_query, analysis_result, metrics)
     
-    # 🐛 DEBUG: 単体最適化クエリを保存（重複防止のため条件付き）
+    # 🔧 REWRITE: 単体最適化クエリを保存（重複防止のため条件付き）
     if isinstance(optimized_query, str) and not optimized_query.startswith("LLM_ERROR:") and save_single_optimization_debug:
-        save_debug_query_trial(optimized_query, current_attempt_num, "single_optimization", query_id="direct_path")
+        save_rewrite_query_trial(optimized_query, current_attempt_num, "single_optimization", query_id="direct_path")
     
     # LLMエラーチェック（重要）
     if isinstance(optimized_query, str) and optimized_query.startswith("LLM_ERROR:"):
@@ -16201,9 +16201,9 @@ def execute_explain_with_retry_logic(original_query: str, analysis_result: str, 
                 current_query  # 🚀 初回最適化クエリ（ヒント付き）を渡す
             )
             
-            # 🐛 DEBUG: 再試行時のエラー修正クエリを保存
+            # 🔧 REWRITE: 再試行時のエラー修正クエリを保存
             if isinstance(corrected_query, str) and not corrected_query.startswith("LLM_ERROR:"):
-                save_debug_query_trial(corrected_query, current_attempt_num, "retry_error_correction", 
+                save_rewrite_query_trial(corrected_query, current_attempt_num, "retry_error_correction", 
                                      query_id=f"retry_{retry_count}", 
                                      error_info=f"再試行{retry_count}のエラー修正: {error_message[:100]}",
                                      retry_num=retry_count)
@@ -16970,9 +16970,9 @@ elif original_query_for_explain and original_query_for_explain.strip():
                     ""  # previous_optimized_queryは空
                 )
                 
-                # 🐛 DEBUG: 元クエリのエラー修正結果を保存
+                # 🔧 REWRITE: 元クエリのエラー修正結果を保存
                 if isinstance(corrected_original_query, str) and not corrected_original_query.startswith("LLM_ERROR:"):
-                    save_debug_query_trial(corrected_original_query, 0, "original_query_correction", 
+                    save_rewrite_query_trial(corrected_original_query, 0, "original_query_correction", 
                                          query_id="original_corrected", 
                                          error_info=f"元クエリ構文エラー修正: {error_message[:100] if error_message else 'unknown error'}")
                 
@@ -17961,11 +17961,15 @@ try:
             f"{OUTPUT_FILE_DIR}/liquid_clustering_analysis_*.md",
             f"{OUTPUT_FILE_DIR}/output_liquid_clustering_guidelines_*.md",
             f"{OUTPUT_FILE_DIR}/output_enhanced_shuffle_analysis_*.md",
+            f"{OUTPUT_FILE_DIR}/rewrite_trial_*.txt",
         ):
             for _md in glob.glob(_pattern):
                 try:
                     os.remove(_md)
-                    print(f"🧹 Deleted markdown file (non-debug mode): {_md}")
+                    if _md.endswith('.txt'):
+                        print(f"🧹 Deleted rewrite trial file (non-debug mode): {_md}")
+                    else:
+                        print(f"🧹 Deleted markdown file (non-debug mode): {_md}")
                 except Exception as _e:
                     print(f"⚠️ Failed to delete {_md}: {_e}")
 except Exception as _e:
