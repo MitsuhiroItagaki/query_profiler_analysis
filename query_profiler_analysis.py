@@ -65,18 +65,10 @@
 # Notebook environment file path configuration (please select from the following options)
 
 # SQLProfiler JSON file (required)
-JSON_FILE_PATH = '/workspace/sample.json'
+JSON_FILE_PATH = '/Workspace/Shared/AutoSQLTuning/sample.json'
 
 # Output file directory (required)
-OUTPUT_FILE_DIR = './'
-
-# Ensure output directory exists
-import os
-if not os.path.exists(OUTPUT_FILE_DIR):
-    os.makedirs(OUTPUT_FILE_DIR, exist_ok=True)
-    print(f"📁 Created output directory: {OUTPUT_FILE_DIR}")
-else:
-    print(f"📁 Using output directory: {OUTPUT_FILE_DIR}")
+OUTPUT_FILE_DIR = './output'
 
 # 🗂️ Catalog and database configuration (used when executing EXPLAIN statements)
 CATALOG = 'tpcds'
@@ -99,6 +91,14 @@ DEBUG_ENABLED = 'Y'
 # - When maximum attempts reached: Use original query
 # Note: This is a separate parameter from syntax error correction (MAX_RETRIES)
 MAX_OPTIMIZATION_ATTEMPTS = 3
+
+# Ensure output directory exists
+import os
+if not os.path.exists(OUTPUT_FILE_DIR):
+    os.makedirs(OUTPUT_FILE_DIR, exist_ok=True)
+    print(f"📁 Created output directory: {OUTPUT_FILE_DIR}")
+else:
+    print(f"📁 Using output directory: {OUTPUT_FILE_DIR}")
 
 # COMMAND ----------
 
