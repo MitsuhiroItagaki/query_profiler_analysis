@@ -1901,12 +1901,37 @@ def extract_detailed_bottleneck_analysis(extracted_metrics: Dict[str, Any], enha
         if should_add_repartition_hint:
             shuffle_attributes = extract_shuffle_attributes(node)
             if shuffle_attributes:
-                # パーティション数の計算ロジック（メモリ効率悪化時統一）
-                # すべてのケースで目標512MB/パーティションに基づいて計算
+                # パーティション数の計算ロジック（repartition_optimizer.pyの正確なメモリベース計算を統合）
+                # Memory per partition threshold (512MB) - repartition_optimizer.pyから統合
+                memory_per_partition_threshold_mb = 512
+                memory_per_partition_threshold_bytes = 512 * 1024 * 1024
+                
                 peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
-                memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
-                target_partitions = int((memory_per_partition_mb / 512) * num_tasks)
-                suggested_partitions = max(target_partitions, num_tasks * 2)
+                
+                # repartition_optimizer.pyの正確な計算ロジック
+                # 現在のパーティション数を取得（複数ソースから）
+                current_partitions = num_tasks  # フォールバック値
+                
+                # より正確なパーティション数を取得
+                detailed_metrics = node.get('detailed_metrics', {})
+                for metric_name in ["Sink - Number of partitions", "Number of partitions", "AQEShuffleRead - Number of partitions"]:
+                    if metric_name in detailed_metrics:
+                        current_partitions = detailed_metrics[metric_name].get('value', current_partitions)
+                        break
+                
+                # メモリベースの正確な計算（repartition_optimizer.pyのロジック）
+                if peak_memory_bytes > 0 and current_partitions > 0:
+                    memory_per_partition = peak_memory_bytes / current_partitions
+                    if memory_per_partition > memory_per_partition_threshold_bytes:
+                        # メモリベースの正確な計算
+                        suggested_partitions = int(round(peak_memory_bytes / memory_per_partition_threshold_bytes))
+                    else:
+                        suggested_partitions = current_partitions
+                else:
+                    # フォールバック: 従来のロジック
+                    memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024) if num_tasks > 0 else 0
+                    target_partitions = int((memory_per_partition_mb / 512) * num_tasks) if num_tasks > 0 else num_tasks * 2
+                    suggested_partitions = max(target_partitions, num_tasks * 2)
                 
                 # Shuffle属性で検出されたカラムを全て使用（完全一致）
                 repartition_columns = ", ".join(shuffle_attributes)
@@ -6125,12 +6150,29 @@ if final_sorted_nodes:
                 
                 # REPARTITIONヒントの提案（スピルが検出された場合のみ）
                 if spill_detected and spill_bytes > 0 and spill_display:
-                    # メモリ効率計算ロジックに統一
+                    # repartition_optimizer.pyの正確なメモリベース計算を統合
+                    memory_per_partition_threshold_mb = 512
+                    memory_per_partition_threshold_bytes = 512 * 1024 * 1024
+                    
                     peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
-                    if peak_memory_bytes > 0 and num_tasks > 0:
-                        memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
-                        target_partitions = int((memory_per_partition_mb / 512) * num_tasks)
-                        suggested_partitions = max(target_partitions, num_tasks * 2)
+                    
+                    # 現在のパーティション数を取得（複数ソースから）
+                    current_partitions = num_tasks  # フォールバック値
+                    
+                    # より正確なパーティション数を取得
+                    detailed_metrics = node.get('detailed_metrics', {})
+                    for metric_name in ["Sink - Number of partitions", "Number of partitions", "AQEShuffleRead - Number of partitions"]:
+                        if metric_name in detailed_metrics:
+                            current_partitions = detailed_metrics[metric_name].get('value', current_partitions)
+                            break
+                    
+                    # メモリベースの正確な計算（repartition_optimizer.pyのロジック）
+                    if peak_memory_bytes > 0 and current_partitions > 0:
+                        memory_per_partition = peak_memory_bytes / current_partitions
+                        if memory_per_partition > memory_per_partition_threshold_bytes:
+                            suggested_partitions = int(round(peak_memory_bytes / memory_per_partition_threshold_bytes))
+                        else:
+                            suggested_partitions = current_partitions
                     else:
                         # フォールバック：従来ロジック
                         suggested_partitions = max(num_tasks * 2, 100)
@@ -9208,12 +9250,29 @@ def generate_top10_time_consuming_processes_report(extracted_metrics: Dict[str, 
                     
                     # REPARTITIONヒントの提案（スピルが検出された場合のみ）
                     if spill_detected and spill_bytes > 0 and spill_display:
-                        # メモリ効率計算ロジックに統一
+                        # repartition_optimizer.pyの正確なメモリベース計算を統合
+                        memory_per_partition_threshold_mb = 512
+                        memory_per_partition_threshold_bytes = 512 * 1024 * 1024
+                        
                         peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
-                        if peak_memory_bytes > 0 and num_tasks > 0:
-                            memory_per_partition_mb = (peak_memory_bytes / num_tasks) / (1024 * 1024)
-                            target_partitions = int((memory_per_partition_mb / 512) * num_tasks)
-                            suggested_partitions = max(target_partitions, num_tasks * 2)
+                        
+                        # 現在のパーティション数を取得（複数ソースから）
+                        current_partitions = num_tasks  # フォールバック値
+                        
+                        # より正確なパーティション数を取得
+                        detailed_metrics = node.get('detailed_metrics', {})
+                        for metric_name in ["Sink - Number of partitions", "Number of partitions", "AQEShuffleRead - Number of partitions"]:
+                            if metric_name in detailed_metrics:
+                                current_partitions = detailed_metrics[metric_name].get('value', current_partitions)
+                                break
+                        
+                        # メモリベースの正確な計算（repartition_optimizer.pyのロジック）
+                        if peak_memory_bytes > 0 and current_partitions > 0:
+                            memory_per_partition = peak_memory_bytes / current_partitions
+                            if memory_per_partition > memory_per_partition_threshold_bytes:
+                                suggested_partitions = int(round(peak_memory_bytes / memory_per_partition_threshold_bytes))
+                            else:
+                                suggested_partitions = current_partitions
                         else:
                             # フォールバック：従来ロジック
                             suggested_partitions = max(num_tasks * 2, 100)
