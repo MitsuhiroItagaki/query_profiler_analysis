@@ -8073,48 +8073,30 @@ def generate_refined_query_with_previous_result(original_query: str, analysis_re
 **最適化クエリのみを出力してください（説明文は不要）：**
 """
 
-    # LLM APIコール実行 - Use the same HTTP API approach as the main LLM functions
-    import json
-    import time
-    import requests
-    import os
-    
+    # LLM APIコール実行 - 設定されたプロバイダーを使用
     try:
-        # Use the same configuration approach as _call_openai_llm
-        config = LLM_CONFIG.get("openai", {})
-        api_key = config.get("api_key", "") or os.environ.get('OPENAI_API_KEY')
+        # 設定されたLLMプロバイダーを使用
+        provider = LLM_CONFIG["provider"]
+        print(f"🤖 Attempting refined optimization with {provider}...")
         
-        if not api_key:
-            print("⚠️ OpenAI API key is not configured")
-            return f"LLM_ERROR: OpenAI API key not configured. Please set LLM_CONFIG['openai']['api_key'] or environment variable OPENAI_API_KEY."
-        
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "model": config.get("model", "gpt-4o"),
-            "messages": [{"role": "user", "content": refined_optimization_prompt}],
-            "max_tokens": 4000,
-            "temperature": 0.3
-        }
-        
-        response = requests.post("https://api.openai.com/v1/chat/completions", 
-                               headers=headers, json=payload, timeout=300)
-        
-        if response.status_code == 200:
-            result = response.json()
-            if result.get('choices'):
-                optimized_query = result['choices'][0]['message']['content']
-                print(f"✅ 試行2回目の最適化クエリを生成しました")
-                return optimized_query
-            else:
-                print("⚠️ LLM response is empty")
-                return f"LLM_ERROR: No optimization suggestions generated"
+        if provider == "databricks":
+            optimized_result = _call_databricks_llm(refined_optimization_prompt)
+        elif provider == "openai":
+            optimized_result = _call_openai_llm(refined_optimization_prompt)
+        elif provider == "azure_openai":
+            optimized_result = _call_azure_openai_llm(refined_optimization_prompt)
+        elif provider == "anthropic":
+            optimized_result = _call_anthropic_llm(refined_optimization_prompt)
         else:
-            print(f"⚠️ OpenAI API Error: Status code {response.status_code}")
-            return f"LLM_ERROR: OpenAI API Error: Status code {response.status_code}\n{response.text}"
+            print(f"⚠️ Unsupported LLM provider: {provider}")
+            return f"LLM_ERROR: Unsupported LLM provider: {provider}"
+        
+        if optimized_result and not optimized_result.startswith("❌") and not optimized_result.startswith("Error"):
+            print(f"✅ 試行2回目の最適化クエリを生成しました")
+            return optimized_result
+        else:
+            print(f"⚠️ LLM optimization failed: {optimized_result}")
+            return f"LLM_ERROR: Failed to generate optimized query: {optimized_result}"
             
     except Exception as e:
         print(f"⚠️ LLM API call failed: {str(e)}")
@@ -15318,11 +15300,29 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
         
         # LLMエラーチェック
         if isinstance(optimized_query, str) and optimized_query.startswith("LLM_ERROR:"):
+            error_details = optimized_query[10:]  # Remove "LLM_ERROR:" prefix
             print(f"❌ LLM error occurred in optimization attempt {attempt_num}")
+            print(f"   📋 Error details: {error_details}")
+            
+            # より詳細なデバッグ情報を出力
+            attempt_type = "initial" if attempt_num == 1 else "single_optimization" if attempt_num == 2 else "performance_improvement"
+            print(f"   🔍 Attempt type: {attempt_type}")
+            print(f"   🤖 LLM provider: {LLM_CONFIG.get('provider', 'unknown')}")
+            
+            # デバッグファイルに保存
+            try:
+                save_debug_query_trial(f"LLM_ERROR: {error_details}", attempt_num, attempt_type, 
+                                     error_info=f"LLM API failure: {error_details}")
+                print(f"   📄 Debug info saved for attempt {attempt_num}")
+            except Exception as debug_save_error:
+                print(f"   ⚠️ Failed to save debug info: {debug_save_error}")
+            
             optimization_attempts.append({
                 'attempt': attempt_num,
                 'status': 'llm_error',
-                'error': optimized_query[10:],
+                'error': error_details,
+                'attempt_type': attempt_type,
+                'llm_provider': LLM_CONFIG.get('provider', 'unknown'),
                 'optimized_query': None
             })
             continue
