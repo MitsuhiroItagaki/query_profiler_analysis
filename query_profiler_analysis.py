@@ -8073,31 +8073,48 @@ def generate_refined_query_with_previous_result(original_query: str, analysis_re
 **最適化クエリのみを出力してください（説明文は不要）：**
 """
 
-    # LLM APIコール実行
+    # LLM APIコール実行 - Use the same HTTP API approach as the main LLM functions
     import json
     import time
+    import requests
+    import os
     
     try:
-        from openai import OpenAI
-        client = OpenAI()
+        # Use the same configuration approach as _call_openai_llm
+        config = LLM_CONFIG.get("openai", {})
+        api_key = config.get("api_key", "") or os.environ.get('OPENAI_API_KEY')
         
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{
-                "role": "user", 
-                "content": refined_optimization_prompt
-            }],
-            max_tokens=4000,
-            temperature=0.3
-        )
+        if not api_key:
+            print("⚠️ OpenAI API key is not configured")
+            return f"LLM_ERROR: OpenAI API key not configured. Please set LLM_CONFIG['openai']['api_key'] or environment variable OPENAI_API_KEY."
         
-        if response.choices:
-            optimized_query = response.choices[0].message.content
-            print(f"✅ 試行2回目の最適化クエリを生成しました")
-            return optimized_query
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": config.get("model", "gpt-4o"),
+            "messages": [{"role": "user", "content": refined_optimization_prompt}],
+            "max_tokens": 4000,
+            "temperature": 0.3
+        }
+        
+        response = requests.post("https://api.openai.com/v1/chat/completions", 
+                               headers=headers, json=payload, timeout=300)
+        
+        if response.status_code == 200:
+            result = response.json()
+            if result.get('choices'):
+                optimized_query = result['choices'][0]['message']['content']
+                print(f"✅ 試行2回目の最適化クエリを生成しました")
+                return optimized_query
+            else:
+                print("⚠️ LLM response is empty")
+                return f"LLM_ERROR: No optimization suggestions generated"
         else:
-            print("⚠️ LLM response is empty")
-            return f"LLM_ERROR: No optimization suggestions generated"
+            print(f"⚠️ OpenAI API Error: Status code {response.status_code}")
+            return f"LLM_ERROR: OpenAI API Error: Status code {response.status_code}\n{response.text}"
             
     except Exception as e:
         print(f"⚠️ LLM API call failed: {str(e)}")
