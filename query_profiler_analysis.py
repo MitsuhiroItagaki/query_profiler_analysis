@@ -246,7 +246,7 @@ SAVE_INTERMEDIATE_RESULTS = 'N'
 # - 'N': 従来の単一ステージの包括的判定のみ
 # 詳細:
 # 1) Stage 1 基本比較: total_size_bytes と row_count の比率から basic_ratio を算出。
-#    - 推奨: basic_ratio > 1.05 で 'use_original'、それ以外は 'use_optimized'
+#    - 推奨: basic_ratio > 1.03 で 'use_original'、それ以外は 'use_optimized'
 #    - 中間保存キー: 'stage1_basic'
 # 2) Stage 2 詳細分析: scan_operations と join_operations の比率から operations_ratio を算出。
 #    - 中間保存キー: 'stage2_detailed'
@@ -7967,8 +7967,8 @@ def generate_refined_query_with_previous_result(original_query: str, analysis_re
     attempt_status = previous_attempt.get('status', 'unknown')
     
     # パフォーマンス状況の判定
-    has_improvement = cost_ratio < 0.95 or memory_ratio < 0.95  # 5%以上の改善
-    has_degradation = cost_ratio > 1.05 or memory_ratio > 1.05  # 5%以上の悪化
+    has_improvement = cost_ratio < 0.97 or memory_ratio < 0.97  # 3%以上の改善
+    has_degradation = cost_ratio > 1.03 or memory_ratio > 1.03  # 3%以上の悪化
     
     # 前回結果の詳細セクション
     previous_result_section = f"""
@@ -13985,12 +13985,12 @@ def comprehensive_performance_judgment(original_metrics, optimized_metrics):
             
             return {
                 'comprehensive_cost_ratio': basic_ratio,
-                'performance_degradation_detected': basic_ratio > 1.05,
+                'performance_degradation_detected': basic_ratio > 1.03,
                 'significant_improvement_detected': basic_ratio < 0.90,
                 'substantial_improvement_detected': basic_ratio < 0.80,
-                'minor_improvement_detected': basic_ratio < 0.95,
-                'is_optimization_beneficial': basic_ratio <= 1.05,
-                'recommendation': 'use_original' if basic_ratio > 1.05 else 'use_optimized',
+                'minor_improvement_detected': basic_ratio < 0.97,
+                'is_optimization_beneficial': basic_ratio <= 1.03,
+                'recommendation': 'use_original' if basic_ratio > 1.03 else 'use_optimized',
                 'improvement_level': 'FALLBACK_BASIC_COMPARISON',
                 'judgment_detail': f'Basic comparison due to error: {str(e)}',
                 'spill_improvement_factor': 1.0,
@@ -14039,28 +14039,28 @@ def comprehensive_performance_judgment(original_metrics, optimized_metrics):
     component_ratios = cost_analysis['component_ratios']
     detailed_ratios = cost_analysis['detailed_ratios']
     
-    # 保守的な閾値設定（測定誤差とリスクを考慮）
+    # 積極的な閾値設定（より細かい改善を検出）
     COMPREHENSIVE_IMPROVEMENT_THRESHOLD = 0.90    # 10%以上の重要改善
-    COMPREHENSIVE_DEGRADATION_THRESHOLD = 1.05    # 5%以上の総合悪化
+    COMPREHENSIVE_DEGRADATION_THRESHOLD = 1.03    # 3%以上の総合悪化
     SUBSTANTIAL_IMPROVEMENT_THRESHOLD = 0.80      # 20%以上の大幅改善
-    MINOR_IMPROVEMENT_THRESHOLD = 0.95            # 5%以上の軽微改善
+    MINOR_IMPROVEMENT_THRESHOLD = 0.97            # 3%以上の軽微改善
     
     print("\n" + "="*80)
     print(t("🎯 パフォーマンス改善レベル判定", "🎯 Performance Improvement Level Judgment"))
     print("="*80)
     
-    print(t(f"\n📏 判定閾値 (保守的アプローチ):",
-             f"\n📏 Judgment Thresholds (Conservative Approach):"))
+    print(t(f"\n📏 判定閾値 (積極的アプローチ):",
+             f"\n📏 Judgment Thresholds (Aggressive Approach):"))
     print(t(f"   大幅改善閾値       : {SUBSTANTIAL_IMPROVEMENT_THRESHOLD:.2f} (20%以上改善)",
              f"   Substantial Improvement Threshold : {SUBSTANTIAL_IMPROVEMENT_THRESHOLD:.2f} (20%+ improvement)"))
     print(t(f"   重要改善閾値       : {COMPREHENSIVE_IMPROVEMENT_THRESHOLD:.2f} (10%以上改善)",
              f"   Significant Improvement Threshold : {COMPREHENSIVE_IMPROVEMENT_THRESHOLD:.2f} (10%+ improvement)"))
-    print(t(f"   軽微改善閾値       : {MINOR_IMPROVEMENT_THRESHOLD:.2f} (5%以上改善)",  
-             f"   Minor Improvement Threshold       : {MINOR_IMPROVEMENT_THRESHOLD:.2f} (5%+ improvement)"))
-    print(t(f"   等価性能範囲       : {MINOR_IMPROVEMENT_THRESHOLD:.2f} - {COMPREHENSIVE_DEGRADATION_THRESHOLD:.2f} (±5%以内)",
-             f"   Equivalent Performance Range     : {MINOR_IMPROVEMENT_THRESHOLD:.2f} - {COMPREHENSIVE_DEGRADATION_THRESHOLD:.2f} (within ±5%)"))
-    print(t(f"   悪化検出閾値       : {COMPREHENSIVE_DEGRADATION_THRESHOLD:.2f} (5%以上悪化)",
-             f"   Degradation Detection Threshold  : {COMPREHENSIVE_DEGRADATION_THRESHOLD:.2f} (5%+ degradation)"))
+    print(t(f"   軽微改善閾値       : {MINOR_IMPROVEMENT_THRESHOLD:.2f} (3%以上改善)",  
+             f"   Minor Improvement Threshold       : {MINOR_IMPROVEMENT_THRESHOLD:.2f} (3%+ improvement)"))
+    print(t(f"   等価性能範囲       : {MINOR_IMPROVEMENT_THRESHOLD:.2f} - {COMPREHENSIVE_DEGRADATION_THRESHOLD:.2f} (±3%以内)",
+             f"   Equivalent Performance Range     : {MINOR_IMPROVEMENT_THRESHOLD:.2f} - {COMPREHENSIVE_DEGRADATION_THRESHOLD:.2f} (within ±3%)"))
+    print(t(f"   悪化検出閾値       : {COMPREHENSIVE_DEGRADATION_THRESHOLD:.2f} (3%以上悪化)",
+             f"   Degradation Detection Threshold  : {COMPREHENSIVE_DEGRADATION_THRESHOLD:.2f} (3%+ degradation)"))
     
     # スピルリスク特別判定（スピルリスクが大幅減少した場合は高評価）
     spill_improvement_factor = 1.0
@@ -14756,7 +14756,7 @@ def compare_query_performance(original_explain_cost: str, optimized_explain_cost
                     'size_ratio': basic_size_ratio,
                     'row_ratio': basic_row_ratio,
                     'basic_ratio': (basic_size_ratio + basic_row_ratio) / 2,
-                    'recommendation': 'use_original' if (basic_size_ratio + basic_row_ratio) / 2 > 1.05 else 'use_optimized'
+                    'recommendation': 'use_original' if (basic_size_ratio + basic_row_ratio) / 2 > 1.03 else 'use_optimized'
                 }
                 print(f"✅ Stage 1 completed: ratio={stage1_result['basic_ratio']:.4f}")
                 save_intermediate_results('stage1_basic', stage1_result)
@@ -14833,12 +14833,12 @@ def compare_query_performance(original_explain_cost: str, optimized_explain_cost
                 
                 return {
                     'comprehensive_cost_ratio': combined_ratio,
-                    'performance_degradation_detected': combined_ratio > 1.05,
+                    'performance_degradation_detected': combined_ratio > 1.03,
                     'significant_improvement_detected': combined_ratio < 0.90,
                     'substantial_improvement_detected': combined_ratio < 0.80,
-                    'minor_improvement_detected': combined_ratio < 0.95,
-                    'is_optimization_beneficial': combined_ratio <= 1.05,
-                    'recommendation': 'use_original' if combined_ratio > 1.05 else 'use_optimized',
+                    'minor_improvement_detected': combined_ratio < 0.97,
+                    'is_optimization_beneficial': combined_ratio <= 1.03,
+                    'recommendation': 'use_original' if combined_ratio > 1.03 else 'use_optimized',
                     'improvement_level': 'STAGE_1_2_COMBINED',
                     'judgment_detail': f'Combined basic and detailed analysis: ratio={combined_ratio:.4f}',
                     'spill_improvement_factor': 1.0,
@@ -14858,11 +14858,11 @@ def compare_query_performance(original_explain_cost: str, optimized_explain_cost
                 print("🔄 Using Stage 1 basic judgment only")
                 return {
                     'comprehensive_cost_ratio': stage1_result['basic_ratio'],
-                    'performance_degradation_detected': stage1_result['basic_ratio'] > 1.05,
+                    'performance_degradation_detected': stage1_result['basic_ratio'] > 1.03,
                     'significant_improvement_detected': stage1_result['basic_ratio'] < 0.90,
                     'substantial_improvement_detected': stage1_result['basic_ratio'] < 0.80,
-                    'minor_improvement_detected': stage1_result['basic_ratio'] < 0.95,
-                    'is_optimization_beneficial': stage1_result['basic_ratio'] <= 1.05,
+                    'minor_improvement_detected': stage1_result['basic_ratio'] < 0.97,
+                    'is_optimization_beneficial': stage1_result['basic_ratio'] <= 1.03,
                     'recommendation': stage1_result['recommendation'],
                     'improvement_level': 'STAGE_1_BASIC_ONLY',
                     'judgment_detail': f'Basic analysis only: ratio={stage1_result["basic_ratio"]:.4f}',
