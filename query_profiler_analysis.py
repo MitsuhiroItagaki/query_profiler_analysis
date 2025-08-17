@@ -8132,6 +8132,7 @@ def generate_optimized_query_with_llm(original_query: str, analysis_result: str,
     else:
         # EXPLAIN無効時でもボトルネック分析に基づく最適化を実行
         print("⚠️ EXPLAIN_ENABLED = 'N': Using bottleneck analysis for optimization without EXPLAIN execution")
+        explain_files = []  # Initialize explain_files for EXPLAIN_ENABLED = 'N' case
         
         if explain_files:
             latest_explain_file = max(explain_files, key=os.path.getctime)
@@ -8578,7 +8579,20 @@ Shuffle効率性スコア: {efficiency_rate:.1f}%
 - 段階的な出力や複数回に分けての出力は禁止です
 - thinking機能で構造理解→一回で完全なSQL出力
 - **❌ BROADCASTヒント（/*+ BROADCAST */、/*+ BROADCAST(table) */）は一切使用禁止**
-- **✅ JOIN戦略はSparkの自動最適化に委ねてヒント不使用で最適化**"""
+- **✅ JOIN戦略はSparkの自動最適化に委ねてヒント不使用で最適化**
+
+【🎯 EXPLAIN_ENABLED = '{explain_enabled}' 時の最適化アプローチ】
+{f'''**🚀 EXPLAINベース最適化モード（EXPLAIN_ENABLED = 'Y'）:**
+- Physical Plan分析とPhoton Explanation分析を最優先
+- EXPLAIN COST統計情報による精密なテーブルサイズベース最適化
+- ボトルネック分析結果との統合的な最適化判断
+- 実行プラン詳細に基づく具体的な改善提案''' if explain_enabled.upper() == 'Y' else '''**🔥 ボトルネック分析ベース最適化モード（EXPLAIN_ENABLED = 'N'）:**
+- 詳細ボトルネック分析結果を最優先情報として扱う
+- Enhanced Shuffle分析による具体的なメモリ効率改善
+- スピル検出・データスキュー・処理時間ボトルネックの直接的解決
+- REPARTITIONヒントの積極的適用（分析結果に基づく具体的数値）
+- JOIN順序最適化とCTE構造化による段階的処理改善
+- ⚠️ EXPLAINデータは利用不可だが、ボトルネック分析で十分な最適化根拠を保有'''}"""
 
     optimization_prompt = f"""
 {prompt_header}
@@ -8589,7 +8603,12 @@ Shuffle効率性スコア: {efficiency_rate:.1f}%
 ```
 
 【📊 セル33詳細ボトルネック分析結果】
+{f'''🚨 EXPLAIN_ENABLED = 'N' - 以下のボトルネック分析結果が最優先最適化根拠です:
+
 {chr(10).join(performance_critical_issues) if performance_critical_issues else "特別な重要課題は設定なし"}
+
+⚠️ 重要: 上記の分析結果に基づいて具体的な最適化を実行してください。
+EXPLAINデータは利用できませんが、このボトルネック分析により十分な最適化判断材料があります。''' if explain_enabled.upper() == 'N' else chr(10).join(performance_critical_issues) if performance_critical_issues else "特別な重要課題は設定なし"}
 
 【🔄 REPARTITIONヒント（スピル検出時のみ）】
 {chr(10).join(repartition_hints) if repartition_hints else "スピルが検出されていないため、REPARTITIONヒントは適用対象外です"}
@@ -8615,10 +8634,15 @@ Sparkの自動JOIN戦略を使用（エラー回避のためヒントは使用�
 {analysis_summary}
 
 【🔧 Enhanced Shuffle操作最適化分析】
+{f'''🚨 EXPLAIN_ENABLED = 'N' - Enhanced Shuffle分析結果による最適化指針:
+
 {enhanced_shuffle_summary}
 
-【🔍 EXPLAIN結果分析（EXPLAIN_ENABLED=Yの場合のみ）】
-{f'''
+⚠️ 重要: Enhanced Shuffle分析で「最適化必要性: はい」の場合は、REPARTITIONヒントを積極的に適用してください。
+メモリ/パーティション > 512MBの場合も最適化対象です。''' if explain_enabled.upper() == 'N' else enhanced_shuffle_summary}
+
+# EXPLAIN_ENABLED = 'Y' の場合のみ EXPLAIN 分析セクションを含める
+{f'''【🔍 EXPLAIN結果分析（EXPLAIN_ENABLED=Yの場合のみ）】
 **Physical Plan分析:**
 ```
 {physical_plan}
@@ -8647,10 +8671,8 @@ Sparkの自動JOIN戦略を使用（エラー回避のためヒントは使用�
 
 **Photon適合のための修正義務:**
 {photon_refactor_requirements}
-''' if explain_enabled.upper() == 'Y' and (physical_plan or photon_explanation) else '(EXPLAIN実行が無効、またはEXPLAIN結果が利用できません)'}
 
 【💰 EXPLAIN COST統計情報分析（統計ベース最適化）】
-{f'''
 **構造化EXPLAIN COST統計情報:**
 ```json
 {cost_statistics}
@@ -8690,7 +8712,37 @@ Sparkの自動JOIN戦略を使用（エラー回避のためヒントは使用�
 - SUMMARY項目は複数操作の集約を示します
 - 詳細は optimization_applied フラグで確認可能
 - Physical Planが100KB超の場合は自動調整済み
-''' if explain_enabled.upper() == 'Y' and cost_statistics else '(EXPLAIN COST実行が無効、または統計情報が利用できません)'}
+''' if explain_enabled.upper() == 'Y' and (physical_plan or photon_explanation or cost_statistics) else f'''【🚨 EXPLAIN_ENABLED = 'N': ボトルネック分析ベースの最適化モード】
+
+**⚠️ EXPLAIN分析は無効化されていますが、詳細なボトルネック分析結果に基づいて最適化を実行します。**
+
+**🎯 ボトルネック分析ベース最適化の重点項目:**
+- セル33スタイルの詳細ボトルネック分析結果を最優先で活用
+- Enhanced Shuffle操作分析に基づく具体的な最適化
+- スピル検出・データスキュー・処理時間ボトルネックの解決
+- REPARTITIONヒント適用（スピル検出時・メモリ効率悪化時）
+- JOIN順序最適化（小テーブル→大テーブルの効率的順序）
+- CTE構造化による段階的処理最適化
+
+**🚀 ボトルネック分析結果を最大限活用した最適化を実行してください:**
+1. 上記の「📊 セル33詳細ボトルネック分析結果」を最重要情報として扱う
+2. 「🔄 REPARTITIONヒント」で提供された具体的な推奨値を正確に適用
+3. 「🚀 処理速度重視の最適化推奨事項」の優先順位に従って最適化
+4. Enhanced Shuffle分析結果のメモリ効率問題を解決
+5. TOP3ボトルネックノードの処理時間短縮を図る
+
+**📊 最適化判断基準（EXPLAIN_ENABLED='N'時）:**
+- スピル検出: {detailed_bottleneck["spill_analysis"]["total_spill_gb"]:.1f}GB → REPARTITIONヒント必須適用
+- データスキュー: {detailed_bottleneck["skew_analysis"]["total_skewed_partitions"]}個 → 分散改善必要
+- Enhanced Shuffle最適化必要性: {'はい' if enhanced_shuffle_analysis.get('overall_assessment', {}).get('needs_optimization', False) else 'いいえ'}
+- TOP3ボトルネック合計時間: {sum(node['duration_ms'] for node in detailed_bottleneck["top_bottleneck_nodes"][:3]):,}ms
+
+**🎯 EXPLAIN無効時の最適化戦略:**
+EXPLAINデータは利用できませんが、上記のボトルネック分析結果により十分な最適化根拠があります。
+分析結果で検出された具体的な問題（スピル、スキュー、メモリ効率、処理時間）に対して、
+提供されたREPARTITIONヒントと最適化推奨事項を正確に適用してください。
+'''}
+
 
 【🎯 処理速度重視の最適化要求】
 **最重要**: 以下の順序で処理速度の改善を優先してください
