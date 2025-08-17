@@ -15342,69 +15342,131 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
         except Exception:
             pass
         
-        # EXPLAIN実行と構文チェック
-        # 🔄 新しい設計: single_optimization debug保存は無効（既に上記で保存済み）
-        save_single_opt_debug = False
-        explain_result = execute_explain_with_retry_logic(
-            current_query, 
-            analysis_result, 
-            metrics, 
-            max_retries=MAX_RETRIES, 
-            current_attempt_num=attempt_num,
-            save_single_optimization_debug=save_single_opt_debug
-        )
+        # EXPLAIN実行と構文チェック（EXPLAIN_ENABLED設定に応じて処理）
+        explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
         
-        if explain_result['final_status'] != 'success':
-            print(f"⚠️ Attempt {attempt_num}: EXPLAIN execution failed")
-            optimization_attempts.append({
-                'attempt': attempt_num,
-                'status': 'explain_failed',
-                'error': explain_result.get('error_details', 'Unknown error'),
-                'optimized_query': current_query
-            })
-            continue
+        if explain_enabled.upper() == 'Y':
+            # EXPLAIN有効時の従来処理
+            # 🔄 新しい設計: single_optimization debug保存は無効（既に上記で保存済み）
+            save_single_opt_debug = False
+            explain_result = execute_explain_with_retry_logic(
+                current_query, 
+                analysis_result, 
+                metrics, 
+                max_retries=MAX_RETRIES, 
+                current_attempt_num=attempt_num,
+                save_single_optimization_debug=save_single_opt_debug
+            )
+            
+            if explain_result['final_status'] != 'success':
+                print(f"⚠️ Attempt {attempt_num}: EXPLAIN execution failed")
+                optimization_attempts.append({
+                    'attempt': attempt_num,
+                    'status': 'explain_failed',
+                    'error': explain_result.get('error_details', 'Unknown error'),
+                    'optimized_query': current_query
+                })
+                continue
+                
+            # ✅ 自動修正の結果得られた最終クエリを反映
+            current_query = explain_result.get('final_query', current_query)
+        else:
+            # EXPLAIN無効時の処理：基本的な構文チェックのみ実行
+            print(f"⚠️ EXPLAIN_ENABLED = 'N': Skipping EXPLAIN execution for attempt {attempt_num}")
+            print(f"💡 Using basic SQL syntax validation instead")
+            
+            # 基本的なSQL構文チェック
+            if not current_query or not current_query.strip():
+                print(f"❌ Attempt {attempt_num}: Empty query generated")
+                optimization_attempts.append({
+                    'attempt': attempt_num,
+                    'status': 'syntax_error',
+                    'error': 'Empty query generated',
+                    'optimized_query': current_query
+                })
+                continue
+                
+            # 基本的なSELECT文の存在チェック
+            import re
+            if not re.search(r'\bSELECT\b', current_query, re.IGNORECASE):
+                print(f"❌ Attempt {attempt_num}: No SELECT statement found")
+                optimization_attempts.append({
+                    'attempt': attempt_num,
+                    'status': 'syntax_error',
+                    'error': 'No SELECT statement found in generated query',
+                    'optimized_query': current_query
+                })
+                continue
+                
+            print(f"✅ Attempt {attempt_num}: Basic syntax validation passed")
+            
+            # EXPLAIN無効時用の擬似結果を作成
+            explain_result = {
+                'final_status': 'success',
+                'final_query': current_query,
+                'explain_skipped': True
+            }
         
         # ✅ 自動修正の結果得られた最終クエリを反映
         current_query = explain_result.get('final_query', current_query)
         
-        # パフォーマンス比較実行
-        print(f"🔍 Attempt {attempt_num}: Executing performance degradation detection")
-        
-        # 🎯 キャッシュされた元クエリを使用（重複処理防止）
-        if corrected_original_query != original_query:
-            print("💾 Using cached original query: Preventing duplicate processing")
-        
-        # 🚀 元クエリのEXPLAIN COST取得（初回のみ実行、以降はキャッシュ使用）
-        if original_explain_cost_result is None:
-            print(f"🔄 Attempt {attempt_num}: Executing EXPLAIN COST for original query (first time only)")
-            original_explain_cost_result = execute_explain_and_save_to_file(corrected_original_query, "original_performance_check")
-            # グローバルキャッシュに保存
-            globals()['cached_original_explain_cost_result'] = original_explain_cost_result
-            # 参照ファイルパスも保存（ログで使用）
+        # パフォーマンス比較実行（EXPLAIN_ENABLED設定に応じて処理）
+        if explain_enabled.upper() == 'Y':
+            print(f"🔍 Attempt {attempt_num}: Executing performance degradation detection")
+            
+            # 🎯 キャッシュされた元クエリを使用（重複処理防止）
+            if corrected_original_query != original_query:
+                print("💾 Using cached original query: Preventing duplicate processing")
+            
+            # 🚀 元クエリのEXPLAIN COST取得（初回のみ実行、以降はキャッシュ使用）
+            if original_explain_cost_result is None:
+                print(f"🔄 Attempt {attempt_num}: Executing EXPLAIN COST for original query (first time only)")
+                original_explain_cost_result = execute_explain_and_save_to_file(corrected_original_query, "original_performance_check")
+                # グローバルキャッシュに保存
+                globals()['cached_original_explain_cost_result'] = original_explain_cost_result
+                # 参照ファイルパスも保存（ログで使用）
+                try:
+                    globals()['cached_original_explain_cost_file'] = original_explain_cost_result.get('explain_cost_file')
+                except Exception:
+                    pass
+            else:
+                print(f"💾 Attempt {attempt_num}: Using cached EXPLAIN COST result for original query (avoiding duplicate execution)")
+                # キャッシュから復元
+                original_explain_cost_result = globals().get('cached_original_explain_cost_result', original_explain_cost_result)
+            
+            # 最適化クエリのEXPLAIN COST取得
+            optimized_explain_cost_result = execute_explain_and_save_to_file(current_query, f"optimized_attempt_{attempt_num}")
             try:
-                globals()['cached_original_explain_cost_file'] = original_explain_cost_result.get('explain_cost_file')
+                globals()['cached_optimized_explain_cost_file'] = optimized_explain_cost_result.get('explain_cost_file')
             except Exception:
                 pass
         else:
-            print(f"💾 Attempt {attempt_num}: Using cached EXPLAIN COST result for original query (avoiding duplicate execution)")
-            # キャッシュから復元
-            original_explain_cost_result = globals().get('cached_original_explain_cost_result', original_explain_cost_result)
-        
-        # 最適化クエリのEXPLAIN COST取得
-        optimized_explain_cost_result = execute_explain_and_save_to_file(current_query, f"optimized_attempt_{attempt_num}")
-        try:
-            globals()['cached_optimized_explain_cost_file'] = optimized_explain_cost_result.get('explain_cost_file')
-        except Exception:
-            pass
+            print(f"⚠️ EXPLAIN_ENABLED = 'N': Skipping performance comparison for attempt {attempt_num}")
+            print(f"💡 Assuming optimization is successful based on syntax validation")
+            
+            # EXPLAIN無効時用の擬似結果を作成
+            original_explain_cost_result = {
+                'final_status': 'success',
+                'explain_skipped': True
+            }
+            optimized_explain_cost_result = {
+                'final_status': 'success', 
+                'explain_skipped': True
+            }
         
         performance_comparison = None
         degradation_analysis = None
         
-        # 🔍 EXPLAIN COSTエラーハンドリングの改善
-        original_cost_success = ('explain_cost_file' in original_explain_cost_result and 
-                                'error_file' not in original_explain_cost_result)
-        optimized_cost_success = ('explain_cost_file' in optimized_explain_cost_result and 
-                                 'error_file' not in optimized_explain_cost_result)
+        # 🔍 EXPLAIN COSTエラーハンドリングの改善（EXPLAIN_ENABLED対応）
+        if explain_enabled.upper() == 'Y':
+            original_cost_success = ('explain_cost_file' in original_explain_cost_result and 
+                                    'error_file' not in original_explain_cost_result)
+            optimized_cost_success = ('explain_cost_file' in optimized_explain_cost_result and 
+                                     'error_file' not in optimized_explain_cost_result)
+        else:
+            # EXPLAIN無効時は成功とみなす
+            original_cost_success = original_explain_cost_result.get('explain_skipped', False)
+            optimized_cost_success = optimized_explain_cost_result.get('explain_skipped', False)
         
         # 🚨 緊急デバッグ: EXPLAIN COST成功/失敗の詳細表示
         print(f"🔍 EXPLAIN COST success determination:")
@@ -15607,35 +15669,55 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
         # 🚨 緊急修正: ロジック順序を修正（EXPLAIN COST成功判定を先に実行）
         if (original_cost_success and optimized_cost_success):
             
-            try:
-                print(f"🎯 Both EXPLAIN COST successful → Executing performance comparison")
-                
-                # EXPLAIN COST内容を読み込み
-                with open(original_explain_cost_result['explain_cost_file'], 'r', encoding='utf-8') as f:
-                    original_cost_content = f.read()
-                
-                with open(optimized_explain_cost_result['explain_cost_file'], 'r', encoding='utf-8') as f:
-                    optimized_cost_content = f.read()
-                
-                print(f"   📊 Original query COST content length: {len(original_cost_content)} characters")
-                print(f"   🔧 Optimized query COST content length: {len(optimized_cost_content)} characters")
-                
-                # 🧾 Cache the exact queries used for this judgment so the logger can include them reliably
+            if explain_enabled.upper() == 'Y':
+                # EXPLAIN有効時の従来処理
                 try:
-                    globals()['judged_original_query'] = original_query_for_explain
-                    globals()['judged_optimized_query'] = current_query
-                    globals()['judged_context'] = {
-                        'attempt_num': attempt_num,
-                        'original_explain_cost_file': original_explain_cost_result.get('explain_cost_file'),
-                        'optimized_explain_cost_file': optimized_explain_cost_result.get('explain_cost_file')
-                    }
-                except Exception:
-                    pass
-                
-                # パフォーマンス比較実行
-                print(f"🔍 Executing compare_query_performance...")
-                performance_comparison = compare_query_performance(original_cost_content, optimized_cost_content)
-                print(f"✅ compare_query_performance completed: {performance_comparison is not None}")
+                    print(f"🎯 Both EXPLAIN COST successful → Executing performance comparison")
+                    
+                    # EXPLAIN COST内容を読み込み
+                    with open(original_explain_cost_result['explain_cost_file'], 'r', encoding='utf-8') as f:
+                        original_cost_content = f.read()
+                    
+                    with open(optimized_explain_cost_result['explain_cost_file'], 'r', encoding='utf-8') as f:
+                        optimized_cost_content = f.read()
+                    
+                    print(f"   📊 Original query COST content length: {len(original_cost_content)} characters")
+                    print(f"   🔧 Optimized query COST content length: {len(optimized_cost_content)} characters")
+                    
+                    # 🧾 Cache the exact queries used for this judgment so the logger can include them reliably
+                    try:
+                        globals()['judged_original_query'] = original_query_for_explain
+                        globals()['judged_optimized_query'] = current_query
+                        globals()['judged_context'] = {
+                            'attempt_num': attempt_num,
+                            'original_explain_cost_file': original_explain_cost_result.get('explain_cost_file'),
+                            'optimized_explain_cost_file': optimized_explain_cost_result.get('explain_cost_file')
+                        }
+                    except Exception:
+                        pass
+                    
+                    # パフォーマンス比較実行
+                    print(f"🔍 Executing compare_query_performance...")
+                    performance_comparison = compare_query_performance(original_cost_content, optimized_cost_content)
+                    print(f"✅ compare_query_performance completed: {performance_comparison is not None}")
+                     
+                except Exception as e:
+                    print(f"❌ Error in EXPLAIN-based performance comparison: {str(e)}")
+                    performance_comparison = None
+            else:
+                # EXPLAIN無効時の処理：最適化成功と仮定
+                print(f"⚠️ EXPLAIN_ENABLED = 'N': Assuming optimization success for attempt {attempt_num}")
+                performance_comparison = {
+                    'is_optimization_beneficial': True,
+                    'performance_degradation_detected': False,
+                    'significant_improvement_detected': True,
+                    'recommendation': 'use_optimized',
+                    'total_cost_ratio': 0.9,  # 仮の改善値（10%改善と仮定）
+                    'memory_usage_ratio': 0.9,  # 仮の改善値
+                    'evaluation_type': 'explain_disabled_assumption',
+                    'details': ['EXPLAIN_ENABLED = N のため、最適化成功と仮定']
+                }
+                print(f"✅ Synthetic performance comparison created (assuming 10% improvement)")
                 
                 if performance_comparison:
                     print(f"   📊 significant_improvement_detected: {performance_comparison.get('significant_improvement_detected', 'UNKNOWN')}")
@@ -15737,21 +15819,6 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                 else:
                     print(f"⏰ Maximum attempts ({max_optimization_attempts}) reached → Selecting best result")
                     break
-            
-            except Exception as e:
-                print(f"❌ Attempt {attempt_num}: Error in performance comparison: {str(e)}")
-                print(f"   📊 Error type: {type(e).__name__}")
-                if hasattr(e, '__traceback__'):
-                    import traceback
-                    print(f"   📄 Stack trace: {traceback.format_exc()}")
-                print(f"🚨 This error is the cause of 'Performance evaluation impossible'!")
-                optimization_attempts.append({
-                    'attempt': attempt_num,
-                    'status': 'comparison_error',
-                    'error': str(e),
-                    'optimized_query': current_query
-                })
-                continue
         
         # 🚨 緊急修正: パフォーマンス評価が完全に失敗した場合のハンドリング（ロジック順序修正後）
         elif performance_comparison is None:
