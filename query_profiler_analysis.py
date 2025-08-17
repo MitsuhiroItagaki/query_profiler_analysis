@@ -4338,11 +4338,12 @@ def analyze_bottlenecks_with_llm(metrics: Dict[str, Any]) -> str:
     photon_explanation = ""
     cost_statistics = ""
     
+    # Import required modules at the beginning to avoid UnboundLocalError
+    import glob
+    import os
+    
     explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
     if explain_enabled.upper() == 'Y':
-        import glob
-        import os
-        
         print("🔍 For bottleneck analysis: Searching EXPLAIN + EXPLAIN COST result files...")
         
         # 最新のEXPLAIN結果ファイルを検索
@@ -4392,6 +4393,9 @@ def analyze_bottlenecks_with_llm(metrics: Dict[str, Any]) -> str:
                 print(f"⚠️ Failed to load cached EXPLAIN COST results: {str(e)}")
                 # フォールバック: 従来のファイル検索
                 cached_cost_result = None
+        
+        # Initialize cost_files variable to avoid UnboundLocalError
+        cost_files = []
         
         # フォールバック: キャッシュが利用できない場合は従来のファイル検索
         if not cached_cost_result:
@@ -8116,11 +8120,12 @@ def generate_optimized_query_with_llm(original_query: str, analysis_result: str,
     photon_explanation = ""
     cost_statistics = ""
     
+    # Import required modules at the beginning to avoid UnboundLocalError
+    import glob
+    import os
+    
     explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
     if explain_enabled.upper() == 'Y':
-        import glob
-        import os
-        
         print("🔍 Searching for EXPLAIN + EXPLAIN COST result files...")
         
         # 1. Search for latest EXPLAIN result files (supporting new filename patterns)
