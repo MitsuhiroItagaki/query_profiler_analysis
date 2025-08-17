@@ -17310,6 +17310,51 @@ else:
     print("❌ No executable original query available")
     print("   Note: Original query extraction from profiler data was unsuccessful")
 
+# 🔧 EXPLAIN_ENABLED = 'N' 時の基本レポート生成処理
+explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
+if explain_enabled.upper() == 'N':
+    print("\n🔧 EXPLAIN_ENABLED = 'N': Generating basic optimization report...")
+    
+    # 必要な変数の確認と初期化
+    try:
+        if 'current_metrics' not in locals():
+            if 'extracted_metrics' in globals():
+                current_metrics = extracted_metrics
+            else:
+                current_metrics = {}
+        
+        if 'current_analysis_result' not in locals():
+            if 'analysis_result' in globals():
+                current_analysis_result = analysis_result
+            else:
+                current_analysis_result = "EXPLAIN_ENABLED = 'N' のため、基本的な分析結果のみ表示"
+        
+        # 基本的な最適化レポートファイルを生成
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        language_suffix = 'en' if OUTPUT_LANGUAGE == 'en' else 'jp'
+        basic_report_filename = f"{OUTPUT_FILE_DIR}/output_optimization_report_{language_suffix}_{timestamp}.md"
+        
+        # 基本レポート内容を生成
+        basic_report_content = generate_comprehensive_optimization_report(
+            "basic_analysis", 
+            original_query_for_explain if 'original_query_for_explain' in locals() else "# Query not available", 
+            current_metrics, 
+            current_analysis_result if isinstance(current_analysis_result, str) else str(current_analysis_result)
+        )
+        
+        # ファイルに保存
+        with open(basic_report_filename, 'w', encoding='utf-8') as f:
+            f.write(basic_report_content)
+        
+        print(f"✅ Basic optimization report saved: {basic_report_filename}")
+        print(f"📊 Report size: {len(basic_report_content):,} characters")
+        
+    except Exception as e:
+        print(f"⚠️ Error generating basic report: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
 print()
 
 
@@ -17332,7 +17377,16 @@ print("\n🔧 Enhanced Shuffle Optimization Report Generation")
 print("-" * 50)
 
 try:
-    if SHUFFLE_ANALYSIS_CONFIG.get("shuffle_analysis_enabled", True) and 'enhanced_shuffle_analysis' in extracted_metrics:
+    # EXPLAIN_ENABLED設定を確認
+    explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
+    
+    # extracted_metricsの存在確認
+    if 'extracted_metrics' not in globals():
+        print("⚠️ extracted_metrics not available - skipping Enhanced Shuffle Analysis")
+    elif explain_enabled.upper() == 'N':
+        print("⚠️ EXPLAIN_ENABLED = 'N' - Enhanced Shuffle Analysis requires EXPLAIN data")
+        print("   To enable Enhanced Shuffle Analysis, set EXPLAIN_ENABLED = 'Y'")
+    elif SHUFFLE_ANALYSIS_CONFIG.get("shuffle_analysis_enabled", True) and 'enhanced_shuffle_analysis' in extracted_metrics:
         print("🔧 Generating Enhanced Shuffle Optimization Report...")
         
         # Shuffle最適化レポートを生成
@@ -17763,15 +17817,71 @@ try:
             print("   🚨 Important: Cell 43 processing may not have been executed at all")
             print("   📋 Solution: Re-execute Cell 43 from the beginning")
         
-        # 🚨 エラーで異常終了
-        print("\n🚨 CRITICAL ERROR: Main optimization report is required but not found")
-        print("📋 Cannot proceed with incomplete report generation")
-        print("⚠️ This indicates that the main analysis processing did not complete successfully")
-        print("💡 Please re-run the main analysis cells to generate the required report files")
-        
-        # システム終了
-        import sys
-        sys.exit(1)
+        # 🔧 EXPLAIN_ENABLED = 'N' 時のフォールバック処理を追加
+        explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
+        if explain_enabled.upper() == 'N':
+            print("\n🔧 EXPLAIN_ENABLED = 'N' detected: Attempting to generate fallback report...")
+            
+            try:
+                # 必要な変数の確認
+                current_metrics = {}
+                current_analysis_result = "EXPLAIN_ENABLED = 'N' のため、基本的な分析結果のみ表示"
+                
+                if 'extracted_metrics' in globals():
+                    current_metrics = extracted_metrics
+                    print("✅ Found extracted_metrics for fallback report")
+                
+                if 'analysis_result' in globals():
+                    current_analysis_result = analysis_result
+                    print("✅ Found analysis_result for fallback report")
+                
+                # フォールバックレポートを生成
+                from datetime import datetime
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                fallback_report_filename = f"{OUTPUT_FILE_DIR}/output_optimization_report_{language_suffix}_{timestamp}.md"
+                
+                fallback_report_content = generate_comprehensive_optimization_report(
+                    "fallback_analysis",
+                    "# EXPLAIN_ENABLED = 'N' のため、基本的な分析レポートを生成\n\n元のクエリ情報は利用できません。",
+                    current_metrics,
+                    current_analysis_result if isinstance(current_analysis_result, str) else str(current_analysis_result)
+                )
+                
+                # ファイルに保存
+                with open(fallback_report_filename, 'w', encoding='utf-8') as f:
+                    f.write(fallback_report_content)
+                
+                print(f"✅ Fallback optimization report created: {fallback_report_filename}")
+                print(f"📊 Report size: {len(fallback_report_content):,} characters")
+                
+                # 最新レポートとして設定
+                latest_report = fallback_report_filename
+                print("🔄 Continuing with fallback report...")
+                
+            except Exception as fallback_error:
+                print(f"❌ Fallback report generation failed: {str(fallback_error)}")
+                import traceback
+                traceback.print_exc()
+                
+                # 🚨 エラーで異常終了
+                print("\n🚨 CRITICAL ERROR: Main optimization report is required but not found")
+                print("📋 Cannot proceed with incomplete report generation")
+                print("⚠️ This indicates that the main analysis processing did not complete successfully")
+                print("💡 Please re-run the main analysis cells to generate the required report files")
+                
+                # システム終了
+                import sys
+                sys.exit(1)
+        else:
+            # 🚨 エラーで異常終了
+            print("\n🚨 CRITICAL ERROR: Main optimization report is required but not found")
+            print("📋 Cannot proceed with incomplete report generation")
+            print("⚠️ This indicates that the main analysis processing did not complete successfully")
+            print("💡 Please re-run the main analysis cells to generate the required report files")
+            
+            # システム終了
+            import sys
+            sys.exit(1)
     else:
         print(f"📄 Target report file: {latest_report}")
         
