@@ -10507,7 +10507,7 @@ def generate_performance_comparison_section(performance_comparison: Dict[str, An
 
 | 項目 | 元クエリ | 最適化クエリ | 比率 | 評価 |
 |------|----------|-------------|------|------|
-| 実行コスト | 1.00 (基準) | {total_cost_ratio:.2f} | {total_cost_ratio:.2f}倍 | {cost_icon} |
+| 実行コスト | 1.00 (基準) | {total_cost_ratio:.3f} | {total_cost_ratio:.3f}倍 | {cost_icon} |
 | メモリ使用量 | 1.00 (基準) | {memory_usage_ratio:.2f} | {memory_usage_ratio:.2f}倍 | {memory_icon} |
 | Photon対応 | {photon_supported_original_text} | {photon_supported_optimized_text} | — | {photon_support_icon} |
 | Photon利用度 | {orig_photon_pct} | {opt_photon_pct} | {photon_ratio_display} | {photon_util_icon} |
@@ -10576,7 +10576,7 @@ def generate_performance_comparison_section(performance_comparison: Dict[str, An
 
 | Item | Original Query | Optimized Query | Ratio | Evaluation |
 |------|----------------|-----------------|-------|------------|
-| Execution Cost | 1.00 (baseline) | {total_cost_ratio:.2f} | {total_cost_ratio:.2f}x | {cost_icon} |
+| Execution Cost | 1.00 (baseline) | {total_cost_ratio:.3f} | {total_cost_ratio:.3f}x | {cost_icon} |
 | Memory Usage | 1.00 (baseline) | {memory_usage_ratio:.2f} | {memory_usage_ratio:.2f}x | {memory_icon} |
 | Photon Support | {photon_supported_original_text} | {photon_supported_optimized_text} | — | {photon_support_icon} |
 | Photon Utilization | {orig_photon_pct} | {opt_photon_pct} | {photon_ratio_display} | {photon_util_icon} |
@@ -13055,7 +13055,7 @@ def generate_improved_query_for_performance_degradation(original_query: str, ana
 ```
 
 **❌ 検出された問題点:**
-- 実行コスト比: {cost_ratio:.2f}倍の悪化
+- 実行コスト比: {cost_ratio:.3f}倍の悪化
 - 主要原因: {primary_cause}
 - 具体的問題: {', '.join(specific_issues)}
 """
@@ -13068,7 +13068,7 @@ def generate_improved_query_for_performance_degradation(original_query: str, ana
 前回の最適化でパフォーマンス悪化が発生しました。悪化原因分析に基づいて **根本的な改善** を行ってください。
 
 【📊 パフォーマンス悪化の詳細分析】
-- **悪化率**: {cost_ratio:.2f}倍（{(cost_ratio-1)*100:.1f}%増加）
+- **悪化率**: {cost_ratio:.3f}倍（{(cost_ratio-1)*100:.1f}%増加）
 - **主要原因**: {primary_cause}
 - **信頼度**: {confidence_level}
 - **具体的問題**: {', '.join(specific_issues)}
@@ -16221,7 +16221,7 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
         status_details = ""
         if 'cost_ratio' in attempt and attempt['cost_ratio'] is not None:
             cost_ratio = attempt['cost_ratio']
-            status_details = f"💰 Cost ratio: {cost_ratio:.2f}x"
+            status_details = f"💰 Cost ratio: {cost_ratio:.3f}x"
         
         print(f"   {status_symbol} Attempt {i} ({attempt_type}): {attempt['status']}")
         if status_details:
@@ -16267,7 +16267,7 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
         # 🚨 緊急修正: best_resultに有効な改善があるのに原因クエリを使う場合の修正
         if best_result['attempt_num'] > 0 and best_result['cost_ratio'] < 1.0:
             print(f"🚨 CRITICAL BUG DETECTED: best_result shows improvement but falling back to original!")
-            print(f"   📊 Best cost ratio: {best_result['cost_ratio']:.4f} (improvement: {(1-best_result['cost_ratio'])*100:.2f}%)")
+            print(f"   📊 Best cost ratio: {best_result['cost_ratio']:.3f} (improvement: {(1-best_result['cost_ratio'])*100:.2f}%)")
             print(f"   🔧 OVERRIDE: Using optimized query instead of original")
             
             final_query = best_result['query']
@@ -16435,7 +16435,7 @@ def execute_explain_with_retry_logic(original_query: str, analysis_result: str, 
                     print(f"📊 Performance comparison results:")
                     cost_ratio = performance_comparison.get('total_cost_ratio', 1.0) or 1.0
                     memory_ratio = performance_comparison.get('memory_usage_ratio', 1.0) or 1.0
-                    print(f"   - Execution cost ratio: {cost_ratio:.2f}x")
+                    print(f"   - Execution cost ratio: {cost_ratio:.3f}x")
                     print(f"   - Memory usage ratio: {memory_ratio:.2f}x")
                     print(f"   - Recommendation: {performance_comparison['recommendation']}")
                     
@@ -16449,7 +16449,7 @@ def execute_explain_with_retry_logic(original_query: str, analysis_result: str, 
                         # 元クエリでのファイル生成（パフォーマンス悪化防止）
                         fallback_result = save_optimized_sql_files(
                             original_query,
-                            f"# 🚨 パフォーマンス悪化検出のため元クエリを使用\n\n## 悪化要因\n{'; '.join(performance_comparison['details'])}\n\n## パフォーマンス比較結果\n- 実行コスト比: {cost_ratio:.2f}倍\n- メモリ使用比: {memory_ratio:.2f}倍\n\n## 元のクエリ（最適化前）\n```sql\n{original_query}\n```",
+                            f"# 🚨 パフォーマンス悪化検出のため元クエリを使用\n\n## 悪化要因\n{'; '.join(performance_comparison['details'])}\n\n## パフォーマンス比較結果\n- 実行コスト比: {cost_ratio:.3f}倍\n- メモリ使用比: {memory_ratio:.2f}倍\n\n## 元のクエリ（最適化前）\n```sql\n{original_query}\n```",
                             metrics,
                             analysis_result,
                             "",  # llm_response
@@ -17456,7 +17456,7 @@ if original_query_for_explain and original_query_for_explain.strip():
                     }.get(attempt['status'], '❓')
                     print(f"   {status_icon} Attempt {attempt['attempt']}: {attempt['status']}")
                     if 'cost_ratio' in attempt and attempt['cost_ratio'] is not None:
-                        print(f"      💰 Cost ratio: {attempt['cost_ratio']:.2f}x")
+                        print(f"      💰 Cost ratio: {attempt['cost_ratio']:.3f}x")
             
             if retry_result['final_status'] in ['optimization_success', 'partial_success']:
                 print("✅ Successfully executed EXPLAIN for optimized query!")
