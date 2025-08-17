@@ -2328,11 +2328,7 @@ def generate_enhanced_shuffle_optimization_report(shuffle_analysis: Dict[str, An
     if output_language == 'ja':
         report_lines = [
             "",
-            "=" * 80,
-            "🔧 Enhanced SHUFFLE操作最適化分析レポート",
-            "=" * 80,
             f"📊 基準: メモリ/パーティション ≤ {SHUFFLE_ANALYSIS_CONFIG['memory_per_partition_threshold_mb']}MB",
-            "=" * 80,
             ""
         ]
         
@@ -2388,7 +2384,7 @@ def generate_enhanced_shuffle_optimization_report(shuffle_analysis: Dict[str, An
                     memory_status = " 📈 要注意"
                 
                 report_lines.extend([
-                    f"{i}. {node['node_name']} (Node ID: {node['node_id']})",
+                    f"{i}. Shuffle (Node ID: {node['node_id']})",
                     f"   {priority_icon} 優先度: {node['optimization_priority']}",
                     f"   📊 パーティション数: {node['partition_count']:,}",
                     f"   🧠 ピークメモリ: {node['peak_memory_gb']} GB",
@@ -2400,6 +2396,7 @@ def generate_enhanced_shuffle_optimization_report(shuffle_analysis: Dict[str, An
                 ])
                 
                 if node["recommendations"]:
+                    report_lines.append("")
                     report_lines.append("   💡 推奨事項:")
                     for rec in node["recommendations"]:
                         report_lines.append(f"     - {rec}")
@@ -2408,38 +2405,32 @@ def generate_enhanced_shuffle_optimization_report(shuffle_analysis: Dict[str, An
         # 全体最適化推奨事項
         if overall["optimization_summary"]:
             report_lines.extend([
-                "🎯 全体最適化推奨事項:",
+                "### 🎯 Shuffle最適化推奨事項",
                 ""
             ])
             for summary in overall["optimization_summary"]:
-                report_lines.append(f"  {summary}")
+                report_lines.append(f"{summary}")
             report_lines.append("")
         
         # 具体的な実装手順
         if overall["needs_optimization"]:
             report_lines.extend([
-                "📋 実装手順 (優先度順):",
-                "",
-                "1️⃣ 緊急対策 (高優先度ノード向け):",
+                "1️⃣ 緊急対策 (高優先度):",
                 "   - クラスターサイズの拡張 (ワーカーノード数増加)",
                 "   - 高メモリインスタンスタイプへの変更",
                 "   - spark.sql.adaptive.coalescePartitions.maxBatchSize の調整",
                 "",
-                "2️⃣ 短期対策 (即座に実行可能):",
+                "2️⃣ 短期対策:",
                 "   - spark.sql.adaptive.coalescePartitions.enabled = true",
                 "   - spark.sql.adaptive.skewJoin.enabled = true", 
                 "   - spark.sql.adaptive.advisoryPartitionSizeInBytes の調整",
                 f"   - 目標: {SHUFFLE_ANALYSIS_CONFIG['memory_per_partition_threshold_mb']}MB/パーティション以下",
                 "",
-                "3️⃣ 中期対策 (計画的実装):",
+                "3️⃣ 中長期対策:",
                 "   - パーティション数の明示的指定 (.repartition())",
                 "   - JOIN戦略の最適化 (ブロードキャストJOINの活用)",
-                "   - データ分散戦略の見直し",
-                "",
-                "4️⃣ 長期対策 (根本的解決):",
                 "   - Liquid Clusteringの実装",
                 "   - テーブル設計の最適化",
-                "   - ワークロード分離の検討",
                 ""
             ])
             
@@ -2451,21 +2442,19 @@ def generate_enhanced_shuffle_optimization_report(shuffle_analysis: Dict[str, An
                 report_lines.extend([
                     "⚙️ 推奨Sparkパラメータ:",
                     "",
+                    "```",
                     f"spark.sql.adaptive.advisoryPartitionSizeInBytes = {target_partition_size_bytes}",
                     "spark.sql.adaptive.coalescePartitions.minPartitionNum = 1",
                     "spark.sql.adaptive.coalescePartitions.maxBatchSize = 100",
-                    "spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes = 268435456",
+                    f"spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes = {target_partition_size_bytes}",
+                    "```",
                     ""
                 ])
         
     else:  # English
         report_lines = [
             "",
-            "=" * 80,
-            "🔧 Enhanced SHUFFLE OPERATION OPTIMIZATION ANALYSIS REPORT",
-            "=" * 80,
             f"📊 Threshold: Memory per Partition ≤ {SHUFFLE_ANALYSIS_CONFIG['memory_per_partition_threshold_mb']}MB",
-            "=" * 80,
             ""
         ]
         
@@ -9203,13 +9192,7 @@ def generate_top10_time_consuming_processes_report(extracted_metrics: Dict[str, 
     """
     report_lines = []
     
-    # タイトルをノード数に応じて調整
-    title = f"最も時間がかかっている処理TOP{limit_nodes}" if limit_nodes <= 10 else "最も時間がかかっている処理TOP10"
-    report_lines.append(f"## 🐌 {title}")
-    report_lines.append("=" * 80)
-    report_lines.append("📊 アイコン説明: ⏱️時間 💾メモリ 🔥🐌並列度 💿スピル ⚖️スキュー")
-    report_lines.append('💿 スピル判定: "Num bytes spilled to disk due to memory pressure" または "Sink - Num bytes spilled to disk due to memory pressure" > 0')
-    report_lines.append("🎯 スキュー判定: 'AQEShuffleRead - Number of skewed partitions' > 0")
+    # 統一されたフォーマットに変更 - 装飾線を削除し、他のセクションと統一
     report_lines.append("")
 
     # ノードを実行時間でソート
@@ -9362,7 +9345,8 @@ def generate_top10_time_consuming_processes_report(extracted_metrics: Dict[str, 
             # スキューアイコン
             skew_icon = "⚖️" if skew_detected else "✅"
             
-            report_lines.append(f"{i+1:2d}. {time_icon}{memory_icon}{parallelism_icon}{spill_icon}{skew_icon} [{severity:8}] {short_name}")
+            # 統一されたテーブル形式に変更
+            report_lines.append(f"| {i+1}. {time_icon} {short_name}")
             report_lines.append(f"    ⏱️  実行時間: {duration_ms:>8,} ms ({duration_ms/1000:>6.1f} sec) - 累積時間の {time_percentage:>5.1f}%")
             report_lines.append(f"    📊 処理行数: {rows_num:>8,} 行")
             report_lines.append(f"    💾 ピークメモリ: {memory_mb:>6.1f} MB")
@@ -11822,9 +11806,10 @@ def refine_report_with_llm(raw_report: str, query_id: str) -> str:
 
 【見出しの骨子（出力に例文を含めないこと）]
 - # 📊 SQL最適化レポート
-- ## 🎯 1. ボトルネック分析結果（AI分析、主要指標、ボトルネック）
-- ## 🐌 2. 最も時間がかかっている処理TOP10（詳細なボトルネック分析、処理時間分析）
-- ## 📋 テーブル最適化推奨
+- ## 🎯 1. パフォーマンス概要（主要指標、ボトルネック）
+- ## 🐌 2. 処理時間分析（詳細なボトルネック分析）
+- ## 🔧 3. Shuffle操作最適化分析（効率性評価、推奨事項）
+- ## 📋 4. テーブル最適化推奨
   ├── catalog_sales テーブル分析
   │   ├── 基本情報（テーブルサイズ・クラスタリングキー情報）
   │   ├── 推奨根拠
@@ -17755,6 +17740,7 @@ def refine_report_content_with_llm(report_content: str) -> str:
 - **必須**: テーブル別詳細分析情報（現在キー、推奨キー、フィルタ率）を削除しない
 - **必須**: SQL実装例（ALTER TABLE、CLUSTER BY等）を完全な形で保持
 - **必須**: Enhanced Shuffle操作最適化分析セクションの内容を完全に保持し、構造と数値データを維持
+- **必須**: 処理時間分析とShuffle操作分析は統一されたリスト形式を使用し、装飾線や独自フォーマットは削除
 - **重複排除**: 同一テーブルの情報が複数セクションに記載されている場合は、より包括的で詳細な情報を持つセクションに統合し、重複部分を削除する
 """
     else:
