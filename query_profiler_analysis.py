@@ -14040,10 +14040,10 @@ def comprehensive_performance_judgment(original_metrics, optimized_metrics):
     detailed_ratios = cost_analysis['detailed_ratios']
     
     # 積極的な閾値設定（より細かい改善を検出）
-    COMPREHENSIVE_IMPROVEMENT_THRESHOLD = 0.982   # 1.8%以上の重要改善
-    COMPREHENSIVE_DEGRADATION_THRESHOLD = 1.02    # 2%以上の総合悪化  
-    SUBSTANTIAL_IMPROVEMENT_THRESHOLD = 0.90      # 10%以上の大幅改善
-    MINOR_IMPROVEMENT_THRESHOLD = 0.998           # 0.2%以上の軽微改善
+    COMPREHENSIVE_IMPROVEMENT_THRESHOLD = 0.90    # 10%以上の重要改善
+    COMPREHENSIVE_DEGRADATION_THRESHOLD = 1.03    # 3%以上の総合悪化  
+    SUBSTANTIAL_IMPROVEMENT_THRESHOLD = 0.80      # 20%以上の大幅改善
+    MINOR_IMPROVEMENT_THRESHOLD = 0.97            # 3%以上の軽微改善
     
     print("\n" + "="*80)
     print(t("🎯 パフォーマンス改善レベル判定", "🎯 Performance Improvement Level Judgment"))
@@ -14051,16 +14051,16 @@ def comprehensive_performance_judgment(original_metrics, optimized_metrics):
     
     print(t(f"\n📏 判定閾値 (積極的アプローチ):",
              f"\n📏 Judgment Thresholds (Aggressive Approach):"))
-    print(t(f"   大幅改善閾値       : {SUBSTANTIAL_IMPROVEMENT_THRESHOLD:.3f} (10%以上改善)",
-             f"   Substantial Improvement Threshold : {SUBSTANTIAL_IMPROVEMENT_THRESHOLD:.3f} (10%+ improvement)"))
-    print(t(f"   重要改善閾値       : {COMPREHENSIVE_IMPROVEMENT_THRESHOLD:.3f} (1.8%以上改善)",
-             f"   Significant Improvement Threshold : {COMPREHENSIVE_IMPROVEMENT_THRESHOLD:.3f} (1.8%+ improvement)"))
-    print(t(f"   軽微改善閾値       : {MINOR_IMPROVEMENT_THRESHOLD:.3f} (0.2%以上改善)",  
-             f"   Minor Improvement Threshold       : {MINOR_IMPROVEMENT_THRESHOLD:.3f} (0.2%+ improvement)"))
-    print(t(f"   等価性能範囲       : {MINOR_IMPROVEMENT_THRESHOLD:.3f} - {COMPREHENSIVE_DEGRADATION_THRESHOLD:.3f} (±0.2%以内)",
-             f"   Equivalent Performance Range     : {MINOR_IMPROVEMENT_THRESHOLD:.3f} - {COMPREHENSIVE_DEGRADATION_THRESHOLD:.3f} (within ±0.2%)"))
-    print(t(f"   悪化検出閾値       : {COMPREHENSIVE_DEGRADATION_THRESHOLD:.3f} (2%以上悪化)",
-             f"   Degradation Detection Threshold  : {COMPREHENSIVE_DEGRADATION_THRESHOLD:.3f} (2%+ degradation)"))
+    print(t(f"   大幅改善閾値       : {SUBSTANTIAL_IMPROVEMENT_THRESHOLD:.2f} (20%以上改善)",
+             f"   Substantial Improvement Threshold : {SUBSTANTIAL_IMPROVEMENT_THRESHOLD:.2f} (20%+ improvement)"))
+    print(t(f"   重要改善閾値       : {COMPREHENSIVE_IMPROVEMENT_THRESHOLD:.2f} (10%以上改善)",
+             f"   Significant Improvement Threshold : {COMPREHENSIVE_IMPROVEMENT_THRESHOLD:.2f} (10%+ improvement)"))
+    print(t(f"   軽微改善閾値       : {MINOR_IMPROVEMENT_THRESHOLD:.2f} (3%以上改善)",  
+             f"   Minor Improvement Threshold       : {MINOR_IMPROVEMENT_THRESHOLD:.2f} (3%+ improvement)"))
+    print(t(f"   等価性能範囲       : {MINOR_IMPROVEMENT_THRESHOLD:.2f} - {COMPREHENSIVE_DEGRADATION_THRESHOLD:.2f} (±3%以内)",
+             f"   Equivalent Performance Range     : {MINOR_IMPROVEMENT_THRESHOLD:.2f} - {COMPREHENSIVE_DEGRADATION_THRESHOLD:.2f} (within ±3%)"))
+    print(t(f"   悪化検出閾値       : {COMPREHENSIVE_DEGRADATION_THRESHOLD:.2f} (3%以上悪化)",
+             f"   Degradation Detection Threshold  : {COMPREHENSIVE_DEGRADATION_THRESHOLD:.2f} (3%+ degradation)"))
     
     # スピルリスク特別判定（スピルリスクが大幅減少した場合は高評価）
     spill_improvement_factor = 1.0
