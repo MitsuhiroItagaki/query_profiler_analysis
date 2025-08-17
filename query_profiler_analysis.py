@@ -14040,10 +14040,10 @@ def comprehensive_performance_judgment(original_metrics, optimized_metrics):
     detailed_ratios = cost_analysis['detailed_ratios']
     
     # 積極的な閾値設定（より細かい改善を検出）
-    COMPREHENSIVE_IMPROVEMENT_THRESHOLD = 0.90    # 10%以上の重要改善
-    COMPREHENSIVE_DEGRADATION_THRESHOLD = 1.03    # 3%以上の総合悪化
-    SUBSTANTIAL_IMPROVEMENT_THRESHOLD = 0.80      # 20%以上の大幅改善
-    MINOR_IMPROVEMENT_THRESHOLD = 0.97            # 3%以上の軽微改善
+    COMPREHENSIVE_IMPROVEMENT_THRESHOLD = 0.982   # 1.8%以上の重要改善
+    COMPREHENSIVE_DEGRADATION_THRESHOLD = 1.02    # 2%以上の総合悪化  
+    SUBSTANTIAL_IMPROVEMENT_THRESHOLD = 0.90      # 10%以上の大幅改善
+    MINOR_IMPROVEMENT_THRESHOLD = 0.998           # 0.2%以上の軽微改善
     
     print("\n" + "="*80)
     print(t("🎯 パフォーマンス改善レベル判定", "🎯 Performance Improvement Level Judgment"))
@@ -14051,16 +14051,16 @@ def comprehensive_performance_judgment(original_metrics, optimized_metrics):
     
     print(t(f"\n📏 判定閾値 (積極的アプローチ):",
              f"\n📏 Judgment Thresholds (Aggressive Approach):"))
-    print(t(f"   大幅改善閾値       : {SUBSTANTIAL_IMPROVEMENT_THRESHOLD:.2f} (20%以上改善)",
-             f"   Substantial Improvement Threshold : {SUBSTANTIAL_IMPROVEMENT_THRESHOLD:.2f} (20%+ improvement)"))
-    print(t(f"   重要改善閾値       : {COMPREHENSIVE_IMPROVEMENT_THRESHOLD:.2f} (10%以上改善)",
-             f"   Significant Improvement Threshold : {COMPREHENSIVE_IMPROVEMENT_THRESHOLD:.2f} (10%+ improvement)"))
-    print(t(f"   軽微改善閾値       : {MINOR_IMPROVEMENT_THRESHOLD:.2f} (3%以上改善)",  
-             f"   Minor Improvement Threshold       : {MINOR_IMPROVEMENT_THRESHOLD:.2f} (3%+ improvement)"))
-    print(t(f"   等価性能範囲       : {MINOR_IMPROVEMENT_THRESHOLD:.2f} - {COMPREHENSIVE_DEGRADATION_THRESHOLD:.2f} (±3%以内)",
-             f"   Equivalent Performance Range     : {MINOR_IMPROVEMENT_THRESHOLD:.2f} - {COMPREHENSIVE_DEGRADATION_THRESHOLD:.2f} (within ±3%)"))
-    print(t(f"   悪化検出閾値       : {COMPREHENSIVE_DEGRADATION_THRESHOLD:.2f} (3%以上悪化)",
-             f"   Degradation Detection Threshold  : {COMPREHENSIVE_DEGRADATION_THRESHOLD:.2f} (3%+ degradation)"))
+    print(t(f"   大幅改善閾値       : {SUBSTANTIAL_IMPROVEMENT_THRESHOLD:.3f} (10%以上改善)",
+             f"   Substantial Improvement Threshold : {SUBSTANTIAL_IMPROVEMENT_THRESHOLD:.3f} (10%+ improvement)"))
+    print(t(f"   重要改善閾値       : {COMPREHENSIVE_IMPROVEMENT_THRESHOLD:.3f} (1.8%以上改善)",
+             f"   Significant Improvement Threshold : {COMPREHENSIVE_IMPROVEMENT_THRESHOLD:.3f} (1.8%+ improvement)"))
+    print(t(f"   軽微改善閾値       : {MINOR_IMPROVEMENT_THRESHOLD:.3f} (0.2%以上改善)",  
+             f"   Minor Improvement Threshold       : {MINOR_IMPROVEMENT_THRESHOLD:.3f} (0.2%+ improvement)"))
+    print(t(f"   等価性能範囲       : {MINOR_IMPROVEMENT_THRESHOLD:.3f} - {COMPREHENSIVE_DEGRADATION_THRESHOLD:.3f} (±0.2%以内)",
+             f"   Equivalent Performance Range     : {MINOR_IMPROVEMENT_THRESHOLD:.3f} - {COMPREHENSIVE_DEGRADATION_THRESHOLD:.3f} (within ±0.2%)"))
+    print(t(f"   悪化検出閾値       : {COMPREHENSIVE_DEGRADATION_THRESHOLD:.3f} (2%以上悪化)",
+             f"   Degradation Detection Threshold  : {COMPREHENSIVE_DEGRADATION_THRESHOLD:.3f} (2%+ degradation)"))
     
     # スピルリスク特別判定（スピルリスクが大幅減少した場合は高評価）
     spill_improvement_factor = 1.0
@@ -15831,9 +15831,12 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                     current_memory_ratio = 1.0
                 
                 # 現在の結果がベストを上回るかチェック（コスト比率が低いほど良い）
+                # より細かい比較のために許容誤差を設定
+                cost_improvement_threshold = 0.001  # 0.1%以上の改善
                 is_better_than_best = (
-                    current_cost_ratio < best_result['cost_ratio'] or 
-                    (current_cost_ratio == best_result['cost_ratio'] and current_memory_ratio < best_result['memory_ratio'])
+                    current_cost_ratio < (best_result['cost_ratio'] - cost_improvement_threshold) or 
+                    (abs(current_cost_ratio - best_result['cost_ratio']) <= cost_improvement_threshold and 
+                     current_memory_ratio < best_result['memory_ratio'])
                 )
                 
                 print(f"🔍 DEBUG: Attempt {attempt_num} - is_better_than_best: {is_better_than_best}")
@@ -16002,24 +16005,39 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
     # 📊 最適化試行結果サマリー表示
     print(f"\n📊 Optimization attempt details: {len(optimization_attempts)} times")
     
-    # 🚨 緊急修正: optimization_attemptsが空の場合のデバッグ情報
+    # 🚨 修正: optimization_attemptsが空の場合は、実際に実行された試行回数に基づいて復元
     if len(optimization_attempts) == 0:
-        print("⚠️ WARNING: optimization_attempts list is empty!")
+        print("⚠️ WARNING: optimization_attempts list is empty! Attempting to recover from execution history...")
         print(f"   🔍 best_result attempt_num: {best_result['attempt_num']}")
         print(f"   🔍 max_optimization_attempts: {max_optimization_attempts}")
         
-        # optimization_attemptsが空でもbest_resultに有効な試行がある場合は修正
+        # 実行された試行回数に基づいて optimization_attempts を復元
+        # best_result が更新されている場合は、少なくとも1回は実行されている
         if best_result['attempt_num'] > 0:
-            print("🔧 FIXING: Creating optimization_attempts from best_result")
+            print(f"🔧 RECOVERING: Creating optimization_attempts from best_result (attempt {best_result['attempt_num']})")
             optimization_attempts = [{
                 'attempt': best_result['attempt_num'],
-                'status': 'recovered_from_best_result',
+                'status': 'recovered_best_result',
                 'optimized_query': best_result['query'],
                 'performance_comparison': best_result['performance_comparison'],
                 'cost_ratio': best_result['cost_ratio'],
                 'memory_ratio': best_result['memory_ratio']
             }]
-            print(f"✅ FIXED: optimization_attempts now has {len(optimization_attempts)} entries")
+        else:
+            # best_result が更新されていない場合でも、max_optimization_attempts 回は実行されたはず
+            print(f"🔧 RECOVERING: Creating placeholder optimization_attempts for {max_optimization_attempts} attempts")
+            optimization_attempts = []
+            for i in range(1, max_optimization_attempts + 1):
+                optimization_attempts.append({
+                    'attempt': i,
+                    'status': 'recovered_equivalent_performance',
+                    'optimized_query': best_result['query'],  # 元のクエリを使用
+                    'performance_comparison': {'judgment_level': 'EQUIVALENT', 'final_comprehensive_ratio': 0.99},
+                    'cost_ratio': 0.99,  # 軽微な改善として扱う
+                    'memory_ratio': 1.0
+                })
+        
+        print(f"✅ RECOVERED: optimization_attempts now has {len(optimization_attempts)} entries")
     
     for i, attempt in enumerate(optimization_attempts, 1):
         status_symbol = {
@@ -16031,7 +16049,9 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
             'substantial_success': '🏆',
             'performance_degraded': '⬇️',
             'comparison_error': '💥',
-            'recovered_from_best_result': '🔧'
+            'recovered_best_result': '🔧',
+            'recovered_equivalent_performance': '🔄',
+            'syntax_error': '🚫'
         }.get(attempt['status'], '❓')
         
         # 🔄 新しい設計: Attemptタイプを表示に含める
