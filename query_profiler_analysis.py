@@ -10489,7 +10489,12 @@ def generate_performance_comparison_section(performance_comparison: Dict[str, An
     
     if language == 'ja':
         # 日本語版の詳細レポート
-        status_text = "🚨 パフォーマンス悪化検出" if degradation_detected else "✅ パフォーマンス改善確認"
+        # EXPLAIN_ENABLED = 'N' の場合の特別処理
+        explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
+        if explain_enabled.upper() == 'N' and not degradation_detected:
+            status_text = "✅ EXPLAIN_ENABLED = 'N'ではEXPLAINが実行できないため推定値です。"
+        else:
+            status_text = "🚨 パフォーマンス悪化検出" if degradation_detected else "✅ パフォーマンス改善確認"
         recommendation_text = "元クエリ使用" if recommendation == 'use_original' else "最適化クエリ使用"
         
         # 改善/悪化の判定アイコン
@@ -10545,7 +10550,7 @@ def generate_performance_comparison_section(performance_comparison: Dict[str, An
 #### 🛡️ 安全性保証
 
 - **パフォーマンス悪化防止**: {'✅ 悪化検出により元クエリを選択' if degradation_detected else '✅ 改善確認により最適化クエリを選択'}
-- **実行可能性**: ✅ EXPLAIN実行で構文検証済み
+- **実行可能性**: {'✅ 構文検証済み（EXPLAIN無効）' if explain_enabled.upper() == 'N' else '✅ EXPLAIN実行で構文検証済み'}
 - **自動フォールバック**: {'✅ 作動 - 安全性を優先' if degradation_detected else '❌ 不要 - 改善効果あり'}
 
 💡 **判定基準**: 実行コスト30%増加 または メモリ使用量50%増加 で悪化と判定
@@ -10553,7 +10558,12 @@ def generate_performance_comparison_section(performance_comparison: Dict[str, An
     
     else:
         # 英語版の詳細レポート
-        status_text = "🚨 Performance Degradation Detected" if degradation_detected else "✅ Performance Improvement Confirmed"
+        # EXPLAIN_ENABLED = 'N' の場合の特別処理
+        explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
+        if explain_enabled.upper() == 'N' and not degradation_detected:
+            status_text = "✅ EXPLAIN_ENABLED = 'N' - This is an estimated value as EXPLAIN cannot be executed."
+        else:
+            status_text = "🚨 Performance Degradation Detected" if degradation_detected else "✅ Performance Improvement Confirmed"
         recommendation_text = "Use Original Query" if recommendation == 'use_original' else "Use Optimized Query"
         
         # 改善/悪化の判定アイコン
@@ -10609,7 +10619,7 @@ def generate_performance_comparison_section(performance_comparison: Dict[str, An
 #### 🛡️ Safety Guarantee
 
 - **Performance Degradation Prevention**: {'✅ Degradation detected, original query selected' if degradation_detected else '✅ Improvement confirmed, optimized query selected'}
-- **Executability**: ✅ Syntax verified via EXPLAIN execution
+- **Executability**: {'✅ Syntax verified (EXPLAIN disabled)' if explain_enabled.upper() == 'N' else '✅ Syntax verified via EXPLAIN execution'}
 - **Automatic Fallback**: {'✅ Activated - Safety prioritized' if degradation_detected else '❌ Not needed - Improvement achieved'}
 
 💡 **Judgment Criteria**: Degradation detected if execution cost increases by 30% OR memory usage increases by 50%
