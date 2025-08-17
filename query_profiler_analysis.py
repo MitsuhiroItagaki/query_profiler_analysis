@@ -311,7 +311,7 @@ try:
     def _cleanup_text_files_when_debug_disabled() -> None:
         debug_flag = str(globals().get('DEBUG_ENABLED', 'N')).upper()
         if debug_flag != 'Y':
-            for _fname in ("optimization_points_summary.txt", "trial_logs.txt"):
+            for _fname in (f"{OUTPUT_FILE_DIR}/optimization_points_summary.txt", f"{OUTPUT_FILE_DIR}/trial_logs.txt"):
                 try:
                     if _os_for_cleanup.path.exists(_fname):
                         _os_for_cleanup.remove(_fname)
@@ -392,7 +392,7 @@ def save_optimization_points_summary(optimization_point: str) -> None:
     try:
         from datetime import datetime
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        summary_filename = "optimization_points_summary.txt"
+        summary_filename = f"{OUTPUT_FILE_DIR}/optimization_points_summary.txt"
         
         with open(summary_filename, 'a', encoding='utf-8') as f:
             f.write(f"[{timestamp}] {optimization_point}\n")
@@ -412,7 +412,7 @@ def save_trial_log(optimization_point: str) -> None:
     try:
         from datetime import datetime
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        trial_log_filename = "trial_logs.txt"
+        trial_log_filename = f"{OUTPUT_FILE_DIR}/trial_logs.txt"
         
         # Check if file exists and has header
         try:
@@ -446,7 +446,7 @@ def load_optimization_points_summary() -> str:
         str: 最適化ポイント要約（最終レポート用）
     """
     try:
-        summary_filename = "optimization_points_summary.txt"
+        summary_filename = f"{OUTPUT_FILE_DIR}/optimization_points_summary.txt"
         
         with open(summary_filename, 'r', encoding='utf-8') as f:
             content = f.read().strip()
