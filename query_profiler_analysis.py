@@ -15873,7 +15873,7 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                 # 注意: 実際の early return は continue 文の前で実行される
                 
                 # 🚀 改善はあるが大幅でない場合の判定
-                elif performance_comparison.get('significant_improvement_detected', False):
+                if performance_comparison.get('significant_improvement_detected', False):
                     print(f"✅ Attempt {attempt_num}: Improvement confirmed (target 10% not reached)")
                     status_reason = "partial_improvement"
                 # 🚀 新規追加: 軽微な改善（3-10%）の正しい処理
