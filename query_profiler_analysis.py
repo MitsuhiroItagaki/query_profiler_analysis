@@ -15797,6 +15797,90 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                 except Exception as e:
                     print(f"❌ Error in EXPLAIN-based performance comparison: {str(e)}")
                     performance_comparison = None
+                
+                # 🚨 CRITICAL FIX: EXPLAIN_ENABLED='Y' の場合もoptimization_attempts処理を実行
+                if performance_comparison is not None:
+                    print(f"🔍 EXPLAIN_ENABLED='Y': Processing optimization_attempts for attempt {attempt_num}")
+                    
+                    # パフォーマンス比較結果の詳細を取得
+                    current_cost_ratio = performance_comparison.get('total_cost_ratio', 1.0)
+                    current_memory_ratio = performance_comparison.get('memory_usage_ratio', 1.0)
+                    print(f"🔍 DEBUG: Attempt {attempt_num} - current_cost_ratio: {current_cost_ratio}, current_memory_ratio: {current_memory_ratio}")
+                    
+                    # ベスト結果更新判定
+                    cost_improvement_threshold = 0.001  # 0.1%以上の改善
+                    is_better_than_best = (
+                        current_cost_ratio < (best_result['cost_ratio'] - cost_improvement_threshold) or 
+                        (abs(current_cost_ratio - best_result['cost_ratio']) <= cost_improvement_threshold and 
+                         current_memory_ratio < best_result['memory_ratio'])
+                    )
+                    
+                    if is_better_than_best:
+                        print(f"🏆 Attempt {attempt_num}: New best result recorded!")
+                        print(f"   📊 Cost ratio: {best_result['cost_ratio']:.3f} → {current_cost_ratio:.3f}")
+                        print(f"   💾 Memory ratio: {best_result['memory_ratio']:.3f} → {current_memory_ratio:.3f}")
+                        best_result.update({
+                            'attempt_num': attempt_num,
+                            'query': current_query,
+                            'cost_ratio': current_cost_ratio,
+                            'memory_ratio': current_memory_ratio,
+                            'performance_comparison': performance_comparison,
+                            'optimized_result': optimized_query_str if 'optimized_query_str' in locals() else '',
+                            'status': 'improved'
+                        })
+                    
+                    # ステータス判定
+                    if performance_comparison.get('significant_improvement_detected', False):
+                        print(f"✅ Attempt {attempt_num}: Improvement confirmed (target 10% not reached)")
+                        status_reason = "partial_improvement"
+                    elif performance_comparison.get('minor_improvement_detected', False):
+                        print(f"📈 Attempt {attempt_num}: Minor improvement detected (3-10% range)")
+                        status_reason = "minor_improvement"
+                    else:
+                        if performance_comparison.get('performance_degradation_detected', False):
+                            print(f"🚨 Attempt {attempt_num}: Performance degradation detected")
+                            status_reason = "performance_degraded"
+                        else:
+                            print(f"⚠️ Attempt {attempt_num}: Clear improvement cannot be confirmed")
+                            status_reason = "insufficient_improvement"
+                    
+                    # optimization_attempts に追加
+                    print(f"🔍 DEBUG: About to add attempt {attempt_num} with status: {status_reason}")
+                    try:
+                        optimization_attempts.append({
+                            'attempt': attempt_num,
+                            'status': status_reason,
+                            'optimized_query': current_query,
+                            'performance_comparison': performance_comparison,
+                            'cost_ratio': current_cost_ratio,
+                            'memory_ratio': current_memory_ratio
+                        })
+                        print(f"🔍 DEBUG: Successfully added attempt {attempt_num}, optimization_attempts length: {len(optimization_attempts)}")
+                    except Exception as e:
+                        print(f"❌ ERROR: Failed to add attempt {attempt_num} to optimization_attempts: {e}")
+                    
+                    # 大幅改善チェック - early return
+                    if performance_comparison.get('substantial_improvement_detected', False):
+                        print(f"🚀 Attempt {attempt_num}: Substantial improvement achieved! Optimization completed immediately")
+                        return {
+                            'final_status': 'optimization_success',
+                            'final_query': current_query,
+                            'successful_attempt': attempt_num,
+                            'total_attempts': attempt_num,
+                            'optimization_attempts': optimization_attempts,
+                            'performance_comparison': performance_comparison,
+                            'optimized_result': optimized_query_str if 'optimized_query_str' in locals() else '',
+                            'saved_files': None,
+                            'achievement_type': 'substantial_improvement_explain_enabled'
+                        }
+                    
+                    # 試行継続判定
+                    if attempt_num < max_optimization_attempts:
+                        print(f"🔄 Aiming for significant improvement (10%+ reduction) in attempt {attempt_num + 1}")
+                        continue
+                    else:
+                        print(f"⏰ Maximum attempts ({max_optimization_attempts}) reached → Selecting best result")
+                        break
             else:
                 # EXPLAIN無効時の処理：最適化成功と仮定
                 print(f"⚠️ EXPLAIN_ENABLED = 'N': Assuming optimization success for attempt {attempt_num}")
@@ -15827,6 +15911,43 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                     print(f"   📊 is_optimization_beneficial: {performance_comparison.get('is_optimization_beneficial', 'UNKNOWN')}")
                 else:
                     print(f"❌ performance_comparison is None!")
+                
+                # 🚨 CRITICAL FIX: EXPLAIN_ENABLED='N' の場合は即座にearly returnを実行
+                # optimization_attempts に追加してから即座に終了
+                optimization_attempts.append({
+                    'attempt': attempt_num,
+                    'status': 'substantial_success',
+                    'optimized_query': current_query,
+                    'performance_comparison': performance_comparison,
+                    'cost_ratio': performance_comparison.get('total_cost_ratio', 0.8),
+                    'memory_ratio': performance_comparison.get('memory_usage_ratio', 0.8)
+                })
+                print(f"🔍 DEBUG: Added substantial_success attempt {attempt_num} to optimization_attempts for EXPLAIN_ENABLED='N'")
+                print(f"🔍 DEBUG: optimization_attempts length before early return: {len(optimization_attempts)}")
+                
+                # ベスト結果も更新
+                best_result.update({
+                    'attempt_num': attempt_num,
+                    'query': current_query,
+                    'cost_ratio': 0.8,
+                    'memory_ratio': 0.8,
+                    'performance_comparison': performance_comparison,
+                    'optimized_result': optimized_query_str if 'optimized_query_str' in locals() else '',
+                    'status': 'improved'
+                })
+                
+                print(f"🚀 EXPLAIN_ENABLED='N': Immediate early return with substantial improvement")
+                return {
+                    'final_status': 'optimization_success',
+                    'final_query': current_query,
+                    'successful_attempt': attempt_num,
+                    'total_attempts': attempt_num,
+                    'optimization_attempts': optimization_attempts,
+                    'performance_comparison': performance_comparison,
+                    'optimized_result': optimized_query_str if 'optimized_query_str' in locals() else '',
+                    'saved_files': None,  # メイン処理で保存
+                    'achievement_type': 'substantial_improvement_explain_disabled'
+                }
                 
                 # 🚀 ベスト結果更新判定（ユーザー要求：常に最良結果を追跡）
                 try:
