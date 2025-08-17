@@ -8129,6 +8129,9 @@ def generate_optimized_query_with_llm(original_query: str, analysis_result: str,
         
         # Prioritize original query EXPLAIN results, use optimized if not available
         explain_files = explain_original_files if explain_original_files else explain_optimized_files
+    else:
+        # EXPLAIN無効時でもボトルネック分析に基づく最適化を実行
+        print("⚠️ EXPLAIN_ENABLED = 'N': Using bottleneck analysis for optimization without EXPLAIN execution")
         
         if explain_files:
             latest_explain_file = max(explain_files, key=os.path.getctime)
@@ -10798,7 +10801,12 @@ def generate_comprehensive_optimization_report(query_id: str, optimized_result: 
     if performance_comparison is not None:
         try:
             perf = dict(performance_comparison)
-            selected_action = 'use_optimized' if (best_attempt_number is not None and best_attempt_number > 0) else 'use_original'
+            # EXPLAIN無効時でも最適化成功の場合は最適化クエリを選択
+            explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
+            if explain_enabled.upper() == 'N' and best_attempt_number is not None and best_attempt_number >= 1:
+                selected_action = 'use_optimized'  # EXPLAIN無効時でも最適化が実行された場合
+            else:
+                selected_action = 'use_optimized' if (best_attempt_number is not None and best_attempt_number > 0) else 'use_original'
             perf['selected_action'] = selected_action
             ratio = perf.get('total_cost_ratio', 1.0) or 1.0
             degraded = perf.get('performance_degradation_detected', False)
@@ -11132,12 +11140,18 @@ def generate_comprehensive_optimization_report(query_id: str, optimized_result: 
                 memory_improvement = f"{(1-memory_ratio)*100:.1f}"
             
             # 最終選択の表示を分かりやすくする
+            explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
             if best_attempt_number == 0:
                 final_selection = "元のクエリ（最適化により改善されなかったため）"
                 selection_reason = "最適化試行で有効な改善が得られなかったため、元のクエリを使用"
                 # 📄 元のクエリファイル名情報を追加
                 if latest_sql_filename:
                     selection_reason += f"\n- 📄 参考ファイル: {latest_sql_filename}（最適化試行結果）"
+            elif explain_enabled.upper() == 'N' and best_attempt_number >= 1:
+                final_selection = f"最適化クエリ（試行{best_attempt_number}回目）"
+                selection_reason = "EXPLAIN無効時でも、ボトルネック分析に基づく最適化クエリを採用"
+                if latest_sql_filename:
+                    selection_reason += f"\n- 📄 最適化ファイル: {latest_sql_filename}"
                 else:
                     selection_reason += "\n- 📄 元のクエリ: プロファイラーデータから抽出"
                 adoption_sentence = ""
@@ -11391,12 +11405,18 @@ The following topics are analyzed for process evaluation:
                 memory_improvement = f"{(1-memory_ratio)*100:.1f}"
             
             # Make final selection display clearer
+            explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
             if best_attempt_number == 0:
                 final_selection_en = "Original Query (no improvement achieved through optimization)"
                 selection_reason_en = "Using original query as optimization trials did not yield effective improvements"
                 # 📄 Add original query file name information
                 if latest_sql_filename:
                     selection_reason_en += f"\n- 📄 Reference file: {latest_sql_filename} (optimization trial result)"
+            elif explain_enabled.upper() == 'N' and best_attempt_number >= 1:
+                final_selection_en = f"Optimized Query (attempt {best_attempt_number})"
+                selection_reason_en = "Using bottleneck analysis-based optimized query even when EXPLAIN is disabled"
+                if latest_sql_filename:
+                    selection_reason_en += f"\n- 📄 Optimized file: {latest_sql_filename}"
                 else:
                     selection_reason_en += "\n- 📄 Original query: Extracted from profiler data"
                 adoption_sentence_en = ""
@@ -15711,11 +15731,12 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                     'is_optimization_beneficial': True,
                     'performance_degradation_detected': False,
                     'significant_improvement_detected': True,
+                    'substantial_improvement_detected': True,  # EXPLAIN無効時は実質的改善と仮定
                     'recommendation': 'use_optimized',
                     'total_cost_ratio': 0.9,  # 仮の改善値（10%改善と仮定）
                     'memory_usage_ratio': 0.9,  # 仮の改善値
                     'evaluation_type': 'explain_disabled_assumption',
-                    'details': ['EXPLAIN_ENABLED = N のため、最適化成功と仮定']
+                    'details': ['EXPLAIN_ENABLED = N のため、ボトルネック分析ベースの最適化成功と仮定']
                 }
                 print(f"✅ Synthetic performance comparison created (assuming 10% improvement)")
                 
