@@ -15297,6 +15297,9 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
     
     optimization_attempts = []
     original_query_for_explain = original_query  # 元クエリの保持
+    
+    print(f"🔍 DEBUG: Initialized optimization_attempts list, length: {len(optimization_attempts)}")
+    print(f"🔍 DEBUG: optimization_attempts object id: {id(optimization_attempts)}")
 
     # 前回実行のキャッシュをクリア（メトリクス重複防止）
     try:
@@ -15681,8 +15684,9 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                     
                     print("✅ Fallback performance evaluation completed")
                     
-                    # 🚨 フォールバック評価でも厳格判定適用
-                    if not performance_comparison.get('significant_improvement_detected', False):
+                    # 🚨 フォールバック評価でも厳格判定適用（軽微な改善も含む）
+                    if not (performance_comparison.get('significant_improvement_detected', False) or 
+                            performance_comparison.get('minor_improvement_detected', False)):
                         if performance_comparison['performance_degradation_detected']:
                             print(f"🚨 Attempt {attempt_num}: Possibility of degradation in fallback evaluation")
                             status_reason = "fallback_degradation_detected"
@@ -15703,8 +15707,9 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                         current_cost_ratio = performance_comparison.get('total_cost_ratio', 1.0)
                         current_memory_ratio = performance_comparison.get('memory_usage_ratio', 1.0)
                         
-                        # フォールバック評価では改善の場合のみベスト更新（不確実性を考慮）
-                        if performance_comparison.get('significant_improvement_detected', False):
+                        # フォールバック評価では改善の場合のみベスト更新（不確実性を考慮、軽微な改善も含む）
+                        if (performance_comparison.get('significant_improvement_detected', False) or 
+                            performance_comparison.get('minor_improvement_detected', False)):
                             is_better_than_best = (
                                 current_cost_ratio < best_result['cost_ratio'] or 
                                 (current_cost_ratio == best_result['cost_ratio'] and current_memory_ratio < best_result['memory_ratio'])
@@ -15816,14 +15821,23 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                     print(f"❌ performance_comparison is None!")
                 
                 # 🚀 ベスト結果更新判定（ユーザー要求：常に最良結果を追跡）
-                current_cost_ratio = performance_comparison['total_cost_ratio']
-                current_memory_ratio = performance_comparison['memory_usage_ratio']
+                try:
+                    current_cost_ratio = performance_comparison.get('total_cost_ratio', 1.0)
+                    current_memory_ratio = performance_comparison.get('memory_usage_ratio', 1.0)
+                    print(f"🔍 DEBUG: Attempt {attempt_num} - current_cost_ratio: {current_cost_ratio}, current_memory_ratio: {current_memory_ratio}")
+                except Exception as e:
+                    print(f"❌ Error accessing performance comparison ratios: {e}")
+                    current_cost_ratio = 1.0
+                    current_memory_ratio = 1.0
                 
                 # 現在の結果がベストを上回るかチェック（コスト比率が低いほど良い）
                 is_better_than_best = (
                     current_cost_ratio < best_result['cost_ratio'] or 
                     (current_cost_ratio == best_result['cost_ratio'] and current_memory_ratio < best_result['memory_ratio'])
                 )
+                
+                print(f"🔍 DEBUG: Attempt {attempt_num} - is_better_than_best: {is_better_than_best}")
+                print(f"🔍 DEBUG: current_cost_ratio ({current_cost_ratio}) < best_result['cost_ratio'] ({best_result['cost_ratio']}): {current_cost_ratio < best_result['cost_ratio']}")
                 
                 if is_better_than_best:
                     print(f"🏆 Attempt {attempt_num}: New best result recorded!")
@@ -15869,6 +15883,12 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                 elif performance_comparison.get('significant_improvement_detected', False):
                     print(f"✅ Attempt {attempt_num}: Improvement confirmed (target 10% not reached)")
                     status_reason = "partial_improvement"
+                # 🚀 新規追加: 軽微な改善（3-10%）の正しい処理
+                elif performance_comparison.get('minor_improvement_detected', False):
+                    print(f"📈 Attempt {attempt_num}: Minor improvement detected (3-10% range)")
+                    print(f"   📊 Cost ratio: {current_cost_ratio:.3f}")
+                    print(f"   💾 Memory ratio: {current_memory_ratio:.3f}")
+                    status_reason = "minor_improvement"
                 else:
                     # 改善なしまたは悪化の場合
                     if performance_comparison['performance_degradation_detected']:
@@ -15893,18 +15913,26 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                 
                 print(f"   Details: {', '.join(performance_comparison.get('details', []))}")
                 
-                optimization_attempts.append({
-                    'attempt': attempt_num,
-                    'status': status_reason,
-                    'optimized_query': current_query,
-                    'performance_comparison': performance_comparison,
-                    'degradation_analysis': degradation_analysis,
-                    'cost_ratio': current_cost_ratio,
-                    'memory_ratio': current_memory_ratio
-                })
+                print(f"🔍 DEBUG: About to add attempt {attempt_num} with status: {status_reason}")
                 
-                # 🚨 デバッグ: optimization_attempts追加後の状態確認
-                print(f"🔍 DEBUG: Added attempt {attempt_num}, optimization_attempts length: {len(optimization_attempts)}")
+                try:
+                    optimization_attempts.append({
+                        'attempt': attempt_num,
+                        'status': status_reason,
+                        'optimized_query': current_query,
+                        'performance_comparison': performance_comparison,
+                        'degradation_analysis': degradation_analysis,
+                        'cost_ratio': current_cost_ratio,
+                        'memory_ratio': current_memory_ratio
+                    })
+                    
+                    # 🚨 デバッグ: optimization_attempts追加後の状態確認
+                    print(f"🔍 DEBUG: Successfully added attempt {attempt_num}, optimization_attempts length: {len(optimization_attempts)}")
+                    print(f"🔍 DEBUG: optimization_attempts contents: {[{'attempt': a['attempt'], 'status': a['status']} for a in optimization_attempts]}")
+                except Exception as e:
+                    print(f"❌ ERROR: Failed to add attempt {attempt_num} to optimization_attempts: {e}")
+                    import traceback
+                    traceback.print_exc()
                 
                 # 🚀 新判定: 大幅改善（10%以上）でない限り試行継続
                 if attempt_num < max_optimization_attempts:
@@ -15966,6 +15994,8 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
     
     # 🚨 デバッグ: 最終選択前の状態確認
     print(f"🔍 DEBUG: Final selection - optimization_attempts length: {len(optimization_attempts)}")
+    print(f"🔍 DEBUG: Final selection - optimization_attempts object id: {id(optimization_attempts)}")
+    print(f"🔍 DEBUG: Final selection - optimization_attempts contents: {[{'attempt': a.get('attempt', 'N/A'), 'status': a.get('status', 'N/A')} for a in optimization_attempts] if optimization_attempts else 'EMPTY'}")
     print(f"🔍 DEBUG: Final selection - best_result attempt_num: {best_result['attempt_num']}")
     print(f"🔍 DEBUG: Final selection - best_result status: {best_result['status']}")
     
@@ -15996,6 +16026,8 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
             'llm_error': '❌',
             'explain_failed': '🚫', 
             'insufficient_improvement': '❓',
+            'minor_improvement': '📈',
+            'partial_improvement': '✅',
             'substantial_success': '🏆',
             'performance_degraded': '⬇️',
             'comparison_error': '💥',
