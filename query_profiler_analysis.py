@@ -15817,6 +15817,10 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                 }
                 print(f"✅ Synthetic performance comparison created with substantial improvement (assuming 20% improvement for bottleneck analysis-based optimization)")
                 
+                # 🔍 DEBUG: 作成された performance_comparison の内容を確認
+                print(f"🔍 DEBUG: Created performance_comparison with substantial_improvement_detected = {performance_comparison.get('substantial_improvement_detected')}")
+                print(f"🔍 DEBUG: performance_comparison object id: {id(performance_comparison)}")
+                
                 if performance_comparison:
                     print(f"   📊 significant_improvement_detected: {performance_comparison.get('significant_improvement_detected', 'UNKNOWN')}")
                     print(f"   📊 performance_degradation_detected: {performance_comparison.get('performance_degradation_detected', 'UNKNOWN')}")
@@ -15860,31 +15864,13 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                         'status': 'improved'
                     })
                 
-                # 🚀 大幅改善（10%以上）達成で即座に終了
-                if performance_comparison.get('substantial_improvement_detected', False):
-                    print(f"🚀 Attempt {attempt_num}: Substantial improvement achieved! Optimization completed immediately")
-                    if explain_enabled.upper() == 'N':
-                        print(f"   🔍 EXPLAIN無効時: ボトルネック分析に基づく最適化を実質的改善として判定")
-                    optimization_attempts.append({
-                        'attempt': attempt_num,
-                        'status': 'substantial_success',
-                        'optimized_query': current_query,
-                        'performance_comparison': performance_comparison,
-                        'cost_ratio': current_cost_ratio,
-                        'memory_ratio': current_memory_ratio
-                    })
-                    
-                    return {
-                        'final_status': 'optimization_success',
-                        'final_query': current_query,
-                        'successful_attempt': attempt_num,
-                        'total_attempts': attempt_num,
-                        'optimization_attempts': optimization_attempts,
-                        'performance_comparison': performance_comparison,
-                        'optimized_result': optimized_query_str,
-                        'saved_files': None,  # メイン処理で保存
-                        'achievement_type': 'substantial_improvement'
-                    }
+                # 🚀 大幅改善（10%以上）達成チェック - この部分は後で continue 文の前に移動済み
+                # 🔍 DEBUG: substantial_improvement_detected の値を確認（デバッグ用）
+                substantial_detected = performance_comparison.get('substantial_improvement_detected', False)
+                print(f"🔍 DEBUG: Inside conditional block - substantial_improvement_detected = {substantial_detected}")
+                print(f"🔍 DEBUG: performance_comparison keys: {list(performance_comparison.keys()) if performance_comparison else 'None'}")
+                
+                # 注意: 実際の early return は continue 文の前で実行される
                 
                 # 🚀 改善はあるが大幅でない場合の判定
                 elif performance_comparison.get('significant_improvement_detected', False):
@@ -15940,6 +15926,44 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                     print(f"❌ ERROR: Failed to add attempt {attempt_num} to optimization_attempts: {e}")
                     import traceback
                     traceback.print_exc()
+                
+                # 🚀 CRITICAL FIX: 大幅改善チェックを continue 文の前に移動
+                # performance_comparison が存在し、substantial_improvement_detected が True の場合は即座に終了
+                if performance_comparison and performance_comparison.get('substantial_improvement_detected', False):
+                    print(f"🚀 Attempt {attempt_num}: Substantial improvement achieved! Optimization completed immediately (moved before continue)")
+                    explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
+                    if explain_enabled.upper() == 'N':
+                        print(f"   🔍 EXPLAIN無効時: ボトルネック分析に基づく最適化を実質的改善として判定")
+                    
+                    # optimization_attempts に追加（既に追加済みの場合は重複を避ける）
+                    # 最後の要素が current attempt でない場合のみ追加
+                    if not optimization_attempts or optimization_attempts[-1].get('attempt') != attempt_num:
+                        optimization_attempts.append({
+                            'attempt': attempt_num,
+                            'status': 'substantial_success',
+                            'optimized_query': current_query,
+                            'performance_comparison': performance_comparison,
+                            'cost_ratio': performance_comparison.get('total_cost_ratio', 0.8),
+                            'memory_ratio': performance_comparison.get('memory_usage_ratio', 0.8)
+                        })
+                        print(f"🔍 DEBUG: Added substantial_success attempt {attempt_num} to optimization_attempts")
+                    else:
+                        print(f"🔍 DEBUG: Attempt {attempt_num} already in optimization_attempts, updating status")
+                        optimization_attempts[-1]['status'] = 'substantial_success'
+                    
+                    print(f"🔍 DEBUG: optimization_attempts length before early return: {len(optimization_attempts)}")
+                    
+                    return {
+                        'final_status': 'optimization_success',
+                        'final_query': current_query,
+                        'successful_attempt': attempt_num,
+                        'total_attempts': attempt_num,
+                        'optimization_attempts': optimization_attempts,
+                        'performance_comparison': performance_comparison,
+                        'optimized_result': optimized_query_str if 'optimized_query_str' in locals() else '',
+                        'saved_files': None,  # メイン処理で保存
+                        'achievement_type': 'substantial_improvement'
+                    }
                 
                 # 🚀 新判定: 大幅改善（10%以上）でない限り試行継続
                 if attempt_num < max_optimization_attempts:
@@ -16005,6 +16029,17 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
     print(f"🔍 DEBUG: Final selection - optimization_attempts contents: {[{'attempt': a.get('attempt', 'N/A'), 'status': a.get('status', 'N/A')} for a in optimization_attempts] if optimization_attempts else 'EMPTY'}")
     print(f"🔍 DEBUG: Final selection - best_result attempt_num: {best_result['attempt_num']}")
     print(f"🔍 DEBUG: Final selection - best_result status: {best_result['status']}")
+    
+    # 🚨 CRITICAL FIX: この時点で optimization_attempts が空の場合、ここに到達すべきではない
+    # EXPLAIN_ENABLED='N' の場合は early return されるべき
+    if len(optimization_attempts) == 0:
+        print("🚨 CRITICAL BUG: optimization_attempts is empty at final selection!")
+        print("🚨 This should not happen - early return should have occurred for EXPLAIN_ENABLED='N'")
+        explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
+        print(f"🚨 Current EXPLAIN_ENABLED setting: {explain_enabled}")
+        if explain_enabled.upper() == 'N':
+            print("🚨 EXPLAIN_ENABLED='N' detected - this is the root cause of the bug!")
+            print("🚨 The early return logic failed to execute properly")
     
     # 📊 最適化試行結果サマリー表示
     print(f"\n📊 Optimization attempt details: {len(optimization_attempts)} times")
