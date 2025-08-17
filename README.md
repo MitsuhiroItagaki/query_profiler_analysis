@@ -107,6 +107,9 @@ The new Shuffle optimization analysis provides:
 - **Optimization priority assessment**: HIGH/MEDIUM/LOW based on memory usage
 - **Actionable recommendations**: Specific partition counts and Spark parameters
 - **Performance improvement steps**: 4-stage implementation guidance (emergency/short/medium/long-term)
+- **Independent operation**: Works with both `EXPLAIN_ENABLED = 'Y'` and `EXPLAIN_ENABLED = 'N'`
+
+**Note**: Enhanced Shuffle Analysis uses profiler data directly from the JSON file and does not require EXPLAIN execution.
 
 ## Configuration summary
 - **JSON_FILE_PATH**: Path to the profiler JSON (DBFS, Workspace, or local)

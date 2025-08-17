@@ -278,6 +278,7 @@ DEBUG_JSON_ENABLED = 'N'
 
 # 🔧 Enhanced Shuffle Optimization Settings (追加機能)
 # Shuffle操作の効率性検証とメモリ最適化推奨事項生成
+# ※ この機能はEXPLAIN_ENABLEDの設定に依存せず、JSONファイルのprofiler dataから直接動作します
 SHUFFLE_ANALYSIS_CONFIG = {
     # Memory per partition threshold (512MB)
     "memory_per_partition_threshold_mb": 512,
@@ -293,7 +294,7 @@ SHUFFLE_ANALYSIS_CONFIG = {
     "enable_cluster_sizing_advice": True,
     
     # Shuffle analysis enabled flag
-    "shuffle_analysis_enabled": True  # 'Y' = enable enhanced shuffle analysis
+    "shuffle_analysis_enabled": True  # True = enable enhanced shuffle analysis
 }
 
 print("🔧 Enhanced Shuffle Optimization Settings configured")
@@ -17507,17 +17508,16 @@ print("\n🔧 Enhanced Shuffle Optimization Report Generation")
 print("-" * 50)
 
 try:
-    # EXPLAIN_ENABLED設定を確認
+    # EXPLAIN_ENABLED設定を確認（情報表示用のみ）
     explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
     
     # extracted_metricsの存在確認
     if 'extracted_metrics' not in globals():
         print("⚠️ extracted_metrics not available - skipping Enhanced Shuffle Analysis")
-    elif explain_enabled.upper() == 'N':
-        print("⚠️ EXPLAIN_ENABLED = 'N' - Enhanced Shuffle Analysis requires EXPLAIN data")
-        print("   To enable Enhanced Shuffle Analysis, set EXPLAIN_ENABLED = 'Y'")
     elif SHUFFLE_ANALYSIS_CONFIG.get("shuffle_analysis_enabled", True) and 'enhanced_shuffle_analysis' in extracted_metrics:
         print("🔧 Generating Enhanced Shuffle Optimization Report...")
+        if explain_enabled.upper() == 'N':
+            print("ℹ️ Enhanced Shuffle Analysis running with EXPLAIN_ENABLED = 'N' - using profiler data directly")
         
         # Shuffle最適化レポートを生成
         shuffle_analysis = extracted_metrics['enhanced_shuffle_analysis']
@@ -17547,7 +17547,12 @@ try:
         else:
             print("📊 No Shuffle operations found in the analysis data")
     else:
-        print("⚠️ Enhanced Shuffle Analysis disabled or not available")
+        if not SHUFFLE_ANALYSIS_CONFIG.get("shuffle_analysis_enabled", True):
+            print("⚠️ Enhanced Shuffle Analysis disabled in configuration")
+        elif 'enhanced_shuffle_analysis' not in extracted_metrics:
+            print("⚠️ Enhanced Shuffle Analysis data not available in extracted_metrics")
+        else:
+            print("⚠️ Enhanced Shuffle Analysis skipped for unknown reason")
         
 except Exception as e:
     print(f"❌ Error during Enhanced Shuffle Analysis Report Generation: {str(e)}")
