@@ -15903,6 +15903,9 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                     'memory_ratio': current_memory_ratio
                 })
                 
+                # 🚨 デバッグ: optimization_attempts追加後の状態確認
+                print(f"🔍 DEBUG: Added attempt {attempt_num}, optimization_attempts length: {len(optimization_attempts)}")
+                
                 # 🚀 新判定: 大幅改善（10%以上）でない限り試行継続
                 if attempt_num < max_optimization_attempts:
                     print(f"🔄 Aiming for significant improvement (10%+ reduction) in attempt {attempt_num + 1}")
@@ -15961,8 +15964,33 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
     print("🏆 Selecting best result as final query")
     print("=" * 60)
     
+    # 🚨 デバッグ: 最終選択前の状態確認
+    print(f"🔍 DEBUG: Final selection - optimization_attempts length: {len(optimization_attempts)}")
+    print(f"🔍 DEBUG: Final selection - best_result attempt_num: {best_result['attempt_num']}")
+    print(f"🔍 DEBUG: Final selection - best_result status: {best_result['status']}")
+    
     # 📊 最適化試行結果サマリー表示
     print(f"\n📊 Optimization attempt details: {len(optimization_attempts)} times")
+    
+    # 🚨 緊急修正: optimization_attemptsが空の場合のデバッグ情報
+    if len(optimization_attempts) == 0:
+        print("⚠️ WARNING: optimization_attempts list is empty!")
+        print(f"   🔍 best_result attempt_num: {best_result['attempt_num']}")
+        print(f"   🔍 max_optimization_attempts: {max_optimization_attempts}")
+        
+        # optimization_attemptsが空でもbest_resultに有効な試行がある場合は修正
+        if best_result['attempt_num'] > 0:
+            print("🔧 FIXING: Creating optimization_attempts from best_result")
+            optimization_attempts = [{
+                'attempt': best_result['attempt_num'],
+                'status': 'recovered_from_best_result',
+                'optimized_query': best_result['query'],
+                'performance_comparison': best_result['performance_comparison'],
+                'cost_ratio': best_result['cost_ratio'],
+                'memory_ratio': best_result['memory_ratio']
+            }]
+            print(f"✅ FIXED: optimization_attempts now has {len(optimization_attempts)} entries")
+    
     for i, attempt in enumerate(optimization_attempts, 1):
         status_symbol = {
             'llm_error': '❌',
@@ -15970,7 +15998,8 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
             'insufficient_improvement': '❓',
             'substantial_success': '🏆',
             'performance_degraded': '⬇️',
-            'comparison_error': '💥'
+            'comparison_error': '💥',
+            'recovered_from_best_result': '🔧'
         }.get(attempt['status'], '❓')
         
         # 🔄 新しい設計: Attemptタイプを表示に含める
@@ -16020,22 +16049,38 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
         
     else:
         print(f"⚠️ Using original query due to errors or evaluation failures in all attempts")
+        print(f"🔍 DEBUG: Fallback reason - optimization_attempts length: {len(optimization_attempts)}")
+        print(f"🔍 DEBUG: Fallback reason - best_result: {best_result}")
         
-        # 試行結果サマリー
-        failure_summary = []
-        for attempt in optimization_attempts:
-            if attempt['status'] == 'performance_degraded':
-                failure_summary.append(f"試行{attempt['attempt']}: {attempt.get('degradation_analysis', {}).get('primary_cause', 'unknown')} (コスト比: {attempt.get('cost_ratio', 'N/A')})")
-            elif attempt['status'] == 'llm_error':
-                failure_summary.append(f"試行{attempt['attempt']}: LLMエラー")
-            elif attempt['status'] == 'explain_failed':
-                failure_summary.append(f"試行{attempt['attempt']}: EXPLAIN実行失敗")
-            elif attempt['status'] == 'comparison_error':
-                failure_summary.append(f"試行{attempt['attempt']}: パフォーマンス比較エラー")
-            else:
-                failure_summary.append(f"試行{attempt['attempt']}: {attempt['status']}")
-        
-        failure_report = f"""# ⚠️ 全最適化試行完了のため、元クエリを使用
+        # 🚨 緊急修正: best_resultに有効な改善があるのに原因クエリを使う場合の修正
+        if best_result['attempt_num'] > 0 and best_result['cost_ratio'] < 1.0:
+            print(f"🚨 CRITICAL BUG DETECTED: best_result shows improvement but falling back to original!")
+            print(f"   📊 Best cost ratio: {best_result['cost_ratio']:.4f} (improvement: {(1-best_result['cost_ratio'])*100:.2f}%)")
+            print(f"   🔧 OVERRIDE: Using optimized query instead of original")
+            
+            final_query = best_result['query']
+            final_optimized_result = best_result['optimized_result']
+            final_performance_comparison = best_result['performance_comparison']
+            final_status = 'optimization_success_recovered'
+            achievement_type = 'bug_fix_recovery'
+            
+            print(f"✅ RECOVERED: Using best result (Attempt {best_result['attempt_num']}) instead of original query")
+        else:
+            # 試行結果サマリー
+            failure_summary = []
+            for attempt in optimization_attempts:
+                if attempt['status'] == 'performance_degraded':
+                    failure_summary.append(f"試行{attempt['attempt']}: {attempt.get('degradation_analysis', {}).get('primary_cause', 'unknown')} (コスト比: {attempt.get('cost_ratio', 'N/A')})")
+                elif attempt['status'] == 'llm_error':
+                    failure_summary.append(f"試行{attempt['attempt']}: LLMエラー")
+                elif attempt['status'] == 'explain_failed':
+                    failure_summary.append(f"試行{attempt['attempt']}: EXPLAIN実行失敗")
+                elif attempt['status'] == 'comparison_error':
+                    failure_summary.append(f"試行{attempt['attempt']}: パフォーマンス比較エラー")
+                else:
+                    failure_summary.append(f"試行{attempt['attempt']}: {attempt['status']}")
+            
+            failure_report = f"""# ⚠️ 全最適化試行完了のため、元クエリを使用
 
 ## 最適化試行結果
 
@@ -16058,12 +16103,12 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
 - より詳細なEXPLAIN情報を取得して手動最適化を検討してください  
 - Liquid Clusteringやテーブル統計の更新を検討してください
 """
-        
-        final_query = original_query
-        final_optimized_result = failure_report
-        final_performance_comparison = None
-        final_status = 'optimization_failed'
-        achievement_type = 'no_improvement'
+            
+            final_query = original_query
+            final_optimized_result = failure_report
+            final_performance_comparison = None
+            final_status = 'optimization_failed'
+            achievement_type = 'no_improvement'
     
     return {
         'final_status': final_status,
