@@ -16993,10 +16993,11 @@ except NameError:
 explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
 print(f"🔍 EXPLAIN execution setting: {explain_enabled}")
 
-if explain_enabled.upper() != 'Y':
-    print("⚠️ EXPLAIN execution is disabled")
-    print("   To execute EXPLAIN statements, set EXPLAIN_ENABLED = 'Y' in the first cell")
-elif original_query_for_explain and original_query_for_explain.strip():
+if original_query_for_explain and original_query_for_explain.strip():
+    if explain_enabled.upper() != 'Y':
+        print("⚠️ EXPLAIN execution is disabled")
+        print("   To execute EXPLAIN statements, set EXPLAIN_ENABLED = 'Y' in the first cell")
+        print("💡 However, optimization will proceed with bottleneck analysis-based approach")
     print("\n🚀 Integrated SQL Optimization & EXPLAIN Execution (with automatic error correction)")
     
     # Spark環境の確認
@@ -17207,6 +17208,9 @@ elif original_query_for_explain and original_query_for_explain.strip():
                 # EXPLAIN無効時の確認メッセージ
                 if explain_enabled.upper() == 'N':
                     print("✅ EXPLAIN無効時でも最適クエリのSQLファイル出力完了")
+                
+                # 最適化処理完了フラグを設定
+                globals()['optimization_process_completed'] = True
                     
             elif retry_result['final_status'] == 'optimization_failed':
                 print("🚨 Using original query due to failure or degradation in all optimization attempts")
@@ -17256,6 +17260,9 @@ elif original_query_for_explain and original_query_for_explain.strip():
                 print("\n📁 Generated files (failure case):")
                 for file_type, filename in saved_files.items():
                     print(f"   📄 {file_type}: {filename}")
+                
+                # 最適化処理完了フラグを設定
+                globals()['optimization_process_completed'] = True
             
             elif retry_result['final_status'] == 'fallback_to_original':
                 print("⚠️ Using original query due to persistent errors in optimized query")
@@ -17342,12 +17349,17 @@ elif original_query_for_explain and original_query_for_explain.strip():
                 print("\n📁 Emergency generated files:")
                 for file_type, filename in emergency_saved_files.items():
                     print(f"   📄 {file_type}: {filename}")
+                
+                # 最適化処理完了フラグを設定
+                globals()['optimization_process_completed'] = True
                     
             except Exception as emergency_error:
                 print(f"🚨 Error even in emergency fallback processing: {str(emergency_error)}")
                 print("⚠️ Please verify query manually")
         
         print("\n✅ Integrated SQL optimization processing completed")
+        # 最適化処理完了フラグを設定
+        globals()['optimization_process_completed'] = True
         
     else:
         print("❌ EXPLAIN statements cannot be executed because Spark environment is not available")
@@ -17357,10 +17369,12 @@ else:
     print("❌ No executable original query available")
     print("   Note: Original query extraction from profiler data was unsuccessful")
 
-# 🔧 EXPLAIN_ENABLED = 'N' 時の基本レポート生成処理
+# 🔧 EXPLAIN_ENABLED = 'N' 時の基本レポート生成処理（完全な最適化処理が実行されなかった場合のみ）
 explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
-if explain_enabled.upper() == 'N':
-    print("\n🔧 EXPLAIN_ENABLED = 'N': Generating basic optimization report...")
+optimization_completed = globals().get('optimization_process_completed', False)
+
+if explain_enabled.upper() == 'N' and not optimization_completed:
+    print("\n🔧 EXPLAIN_ENABLED = 'N' and optimization not completed: Generating basic optimization report...")
     
     # 必要な変数の確認と初期化
     try:
@@ -17401,6 +17415,8 @@ if explain_enabled.upper() == 'N':
         print(f"⚠️ Error generating basic report: {str(e)}")
         import traceback
         traceback.print_exc()
+elif optimization_completed:
+    print("✅ Full optimization process was completed - skipping basic report generation")
 
 print()
 
