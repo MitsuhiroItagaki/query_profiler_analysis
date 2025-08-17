@@ -11469,6 +11469,7 @@ The following topics are analyzed for process evaluation:
             if best_attempt_number == 0:
                 final_selection_en = "Original Query (no improvement achieved through optimization)"
                 selection_reason_en = "Using original query as optimization trials did not yield effective improvements"
+                adoption_sentence_en = ""
                 # 📄 Add original query file name information
                 if latest_sql_filename:
                     selection_reason_en += f"\n- 📄 Reference file: {latest_sql_filename} (optimization trial result)"
