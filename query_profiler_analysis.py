@@ -14394,6 +14394,10 @@ def comprehensive_performance_judgment(original_metrics, optimized_metrics):
         'original_comprehensive_ratio': comprehensive_ratio
     }
     
+    # 🚨 CRITICAL FIX: Add top-level cost ratios for best_result update logic
+    judgment['total_cost_ratio'] = final_comprehensive_ratio
+    judgment['memory_usage_ratio'] = component_ratios.get('memory_efficiency', 1.0)
+    
     return judgment
 
 def compare_query_performance(original_explain_cost: str, optimized_explain_cost: str) -> Dict[str, Any]:
