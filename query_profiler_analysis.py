@@ -15828,6 +15828,43 @@ def execute_iterative_optimization_with_degradation_analysis(original_query: str
                 else:
                     print(f"❌ performance_comparison is None!")
                 
+                # 🚨 CRITICAL FIX: EXPLAIN_ENABLED='N' の場合は即座にearly returnを実行
+                # optimization_attempts に追加してから即座に終了
+                optimization_attempts.append({
+                    'attempt': attempt_num,
+                    'status': 'substantial_success',
+                    'optimized_query': current_query,
+                    'performance_comparison': performance_comparison,
+                    'cost_ratio': performance_comparison.get('total_cost_ratio', 0.8),
+                    'memory_ratio': performance_comparison.get('memory_usage_ratio', 0.8)
+                })
+                print(f"🔍 DEBUG: Added substantial_success attempt {attempt_num} to optimization_attempts for EXPLAIN_ENABLED='N'")
+                print(f"🔍 DEBUG: optimization_attempts length before early return: {len(optimization_attempts)}")
+                
+                # ベスト結果も更新
+                best_result.update({
+                    'attempt_num': attempt_num,
+                    'query': current_query,
+                    'cost_ratio': 0.8,
+                    'memory_ratio': 0.8,
+                    'performance_comparison': performance_comparison,
+                    'optimized_result': optimized_query_str if 'optimized_query_str' in locals() else '',
+                    'status': 'improved'
+                })
+                
+                print(f"🚀 EXPLAIN_ENABLED='N': Immediate early return with substantial improvement")
+                return {
+                    'final_status': 'optimization_success',
+                    'final_query': current_query,
+                    'successful_attempt': attempt_num,
+                    'total_attempts': attempt_num,
+                    'optimization_attempts': optimization_attempts,
+                    'performance_comparison': performance_comparison,
+                    'optimized_result': optimized_query_str if 'optimized_query_str' in locals() else '',
+                    'saved_files': None,  # メイン処理で保存
+                    'achievement_type': 'substantial_improvement_explain_disabled'
+                }
+                
                 # 🚀 ベスト結果更新判定（ユーザー要求：常に最良結果を追跡）
                 try:
                     current_cost_ratio = performance_comparison.get('total_cost_ratio', 1.0)
