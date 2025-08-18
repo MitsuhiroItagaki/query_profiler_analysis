@@ -58,27 +58,23 @@
 
 # COMMAND ----------
 
-# 📁 SQL Profiler JSON File Path Configuration
-# 
-# Please change the JSON_FILE_PATH below to your actual file path:
-
-# Notebook environment file path configuration (please select from the following options)
+# 📁 Input/Output Configuration
 
 # SQLProfiler JSON file (required)
-JSON_FILE_PATH = '/Workspace/Shared/AutoSQLTuning/sample.json'
+JSON_FILE_PATH = '/Workspace/Shared/AutoSQLTuning/query-profile_01f07bbf-bb55-18a3-aa29-0cc57144b438.json'
 
 # Output file directory (required)
 OUTPUT_FILE_DIR = './output'
 
-# 🗂️ Catalog and database configuration (used when executing EXPLAIN statements)
-CATALOG = 'tpcds'
-DATABASE = 'tpcds_sf1000_delta_lc'
-
 # 🌐 Output language setting (OUTPUT_LANGUAGE: 'ja' = Japanese, 'en' = English)
-OUTPUT_LANGUAGE = 'ja'
+OUTPUT_LANGUAGE = 'en'
 
 # 🔍 EXPLAIN statement execution setting (EXPLAIN_ENABLED: 'Y' = execute, 'N' = do not execute)
 EXPLAIN_ENABLED = 'Y'
+
+# 🗂️ Catalog and database configuration (used when executing EXPLAIN statements)
+CATALOG = 'tpcds'
+DATABASE = 'tpcds_sf1000_delta_lc'
 
 # 🐛 Debug mode setting (DEBUG_ENABLED: 'Y' = keep intermediate files, 'N' = keep final files only)
 DEBUG_ENABLED = 'Y'
