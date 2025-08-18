@@ -77,7 +77,7 @@ CATALOG = 'tpcds'
 DATABASE = 'tpcds_sf1000_delta_lc'
 
 # 🐛 Debug mode setting (DEBUG_ENABLED: 'Y' = keep intermediate files, 'N' = keep final files only)
-DEBUG_ENABLED = 'Y'
+DEBUG_ENABLED = 'N'
 
 # 🚀 Iterative optimization maximum attempt count settings (MAX_OPTIMIZATION_ATTEMPTS: default 3 times)
 # 🔄 New design: Each attempt is clearly evaluated
