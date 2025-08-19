@@ -9413,9 +9413,9 @@ FROM table1 cs
 
 
 
-def generate_top10_time_consuming_processes_report(extracted_metrics: Dict[str, Any], limit_nodes: int = 10) -> str:
+def generate_top10_time_consuming_processes_data(extracted_metrics: Dict[str, Any], limit_nodes: int = 10) -> Dict[str, Any]:
     """
-    最も時間がかかっている処理のレポートを文字列として生成
+    最も時間がかかっている処理の分析データを生成（言語非依存）
 
     🚨 重要: パーセンテージ計算デグレ防止
     - 並列実行ノードの時間合計を全体時間として使用することは絶対に禁止
@@ -9427,13 +9427,8 @@ def generate_top10_time_consuming_processes_report(extracted_metrics: Dict[str, 
         limit_nodes: 表示するノード数（デフォルト10、ファイル出力時は5）
     
     Returns:
-        str: 処理レポート
+        Dict[str, Any]: 統一された分析データ
     """
-    report_lines = []
-    
-    # 統一されたフォーマットに変更 - 装飾線を削除し、他のセクションと統一
-    report_lines.append("")
-
     # ノードを実行時間でソート
     sorted_nodes = sorted(extracted_metrics['node_metrics'], 
                          key=lambda x: x['key_metrics'].get('durationMs', 0), 
@@ -9441,6 +9436,17 @@ def generate_top10_time_consuming_processes_report(extracted_metrics: Dict[str, 
     
     # 指定されたノード数まで処理
     final_sorted_nodes = sorted_nodes[:limit_nodes]
+    
+    # 統一されたデータ構造を初期化
+    analysis_data = {
+        'summary': {
+            'total_nodes_analyzed': len(final_sorted_nodes),
+            'total_duration': 0,
+            'total_top_nodes_duration': 0,
+            'calculation_method': 'unknown'
+        },
+        'nodes': []
+    }
 
     if final_sorted_nodes:
         # 🚨 重要: 正しい全体時間の計算（デグレ防止）
@@ -9712,30 +9718,348 @@ def generate_top10_time_consuming_processes_report(extracted_metrics: Dict[str, 
                         # Use all detected shuffle attribute columns (exact match)
                         repartition_columns = ", ".join(shuffle_attributes)
                         
-                        report_lines.append(f"- 💡 **Optimization suggestion**: REPARTITION({suggested_partitions}, {repartition_columns})")
-                        report_lines.append(f"  - **Reason**: To improve spill ({spill_mb:.1f} MB)")
-                        report_lines.append(f"  - **Target**: Complete use of all {len(shuffle_attributes)} shuffle attribute columns")
+                        optimization_suggestion = {
+                            'type': 'repartition',
+                            'suggested_partitions': suggested_partitions,
+                            'columns': repartition_columns,
+                            'reason': f"To improve spill ({spill_mb:.1f} MB)",
+                            'target': f"Complete use of all {len(shuffle_attributes)} shuffle attribute columns"
+                        }
+                    else:
+                        optimization_suggestion = None
                 else:
-                    report_lines.append(f"- 🔄 Shuffle attributes: Not configured")
+                    shuffle_attributes = []
+                    optimization_suggestion = None
+            else:
+                shuffle_attributes = []
+                optimization_suggestion = None
             
-            # Display clustering keys for scan nodes
+            # クラスタリングキーの取得（scanノード用）
+            cluster_attributes = []
             if "scan" in raw_node_name.lower():
                 cluster_attributes = extract_cluster_attributes(node)
-                if cluster_attributes:
-                    report_lines.append(f"- 📊 Clustering keys: {', '.join(cluster_attributes)}")
-                else:
-                    report_lines.append(f"- 📊 Clustering keys: Not configured")
             
-            # Skew details
-            if skew_detected and skewed_partitions > 0:
-                report_lines.append(f"- ⚖️ Skew details: {skewed_partitions} skewed partitions (AQEShuffleRead detection)")
+            # ノードデータを構造化
+            node_data = {
+                'rank': i + 1,
+                'node_id': node.get('node_id', node.get('id', 'N/A')),
+                'node_name': node_name,
+                'short_name': short_name,
+                'raw_node_name': raw_node_name,
+                'duration_ms': duration_ms,
+                'time_percentage': time_percentage,
+                'rows_processed': rows_num,
+                'memory_mb': memory_mb,
+                'severity': severity,
+                'icons': {
+                    'time': time_icon,
+                    'memory': memory_icon,
+                    'parallelism': parallelism_icon,
+                    'spill': spill_icon,
+                    'skew': skew_icon
+                },
+                'parallelism': {
+                    'num_tasks': num_tasks,
+                    'data': parallelism_data,
+                    'display': parallelism_display
+                },
+                'spill': {
+                    'detected': spill_detected,
+                    'bytes': spill_bytes,
+                    'mb': spill_bytes / (1024 * 1024) if spill_bytes > 0 else 0,
+                    'gb': spill_bytes / (1024 * 1024 * 1024) if spill_bytes > 0 else 0
+                },
+                'skew': {
+                    'detected': skew_detected,
+                    'partitions': skewed_partitions,
+                    'aqe_shuffle_warning': aqe_shuffle_skew_warning,
+                    'status': skew_status
+                },
+                'filter_analysis': filter_result,
+                'shuffle_attributes': shuffle_attributes,
+                'cluster_attributes': cluster_attributes,
+                'optimization_suggestion': optimization_suggestion,
+                'aqe_shuffle_metrics': aqe_shuffle_metrics,
+                'processing_efficiency': {
+                    'rows_per_sec': (rows_num * 1000) / duration_ms if duration_ms > 0 else 0
+                }
+            }
             
-            # Also display Node ID
-            report_lines.append(f"- 🆔 Node ID: {node.get('node_id', node.get('id', 'N/A'))}")
+            analysis_data['nodes'].append(node_data)
+        
+        # サマリー情報を更新
+        analysis_data['summary'].update({
+            'total_duration': total_duration,
+            'total_top_nodes_duration': sum(node['key_metrics'].get('durationMs', 0) for node in final_sorted_nodes),
+            'calculation_method': 'task_total_time_ms' if task_total_time_ms > 0 else 'execution_time_ms' if overall_metrics.get('execution_time_ms', 0) > 0 else 'estimated'
+        })
+    
+    return analysis_data
+
+
+def generate_top10_time_consuming_processes_report(extracted_metrics: Dict[str, Any], limit_nodes: int = 10, output_language: str = None) -> str:
+    """
+    統一されたTop 10プロセス分析レポートを生成（言語対応）
+    
+    Args:
+        extracted_metrics: 抽出されたメトリクス
+        limit_nodes: 表示するノード数
+        output_language: 出力言語 ('ja' or 'en')
+    
+    Returns:
+        str: レポート文字列
+    """
+    if output_language is None:
+        output_language = globals().get('OUTPUT_LANGUAGE', 'ja')
+    
+    # 統一されたデータ構造を取得
+    analysis_data = generate_top10_time_consuming_processes_data(extracted_metrics, limit_nodes)
+    
+    # 言語別にレポートを生成
+    if output_language == 'en':
+        return _format_top10_report_en(analysis_data, limit_nodes)
+    else:
+        return _format_top10_report_ja(analysis_data, limit_nodes)
+
+
+def _format_top10_report_ja(analysis_data: Dict[str, Any], limit_nodes: int) -> str:
+    """日本語版Top 10レポートフォーマッター"""
+    report_lines = []
+    report_lines.append("")
+    
+    summary = analysis_data['summary']
+    nodes = analysis_data['nodes']
+    
+    if nodes:
+        report_lines.append(f"📊 累積タスク実行時間（並列）: {summary['total_duration']:,} ms ({summary['total_duration']/3600000:.1f} 時間)")
+        report_lines.append(f"📈 TOP{limit_nodes}合計時間（並列実行）: {summary['total_top_nodes_duration']:,} ms")
+        report_lines.append("")
+        
+        for node in nodes:
+            # 基本情報表示
+            icons = node['icons']
+            severity = node['severity']
+            short_name = node['short_name']
+            
+            report_lines.append(f"### {node['rank']}. {icons['time']}{icons['memory']}{icons['parallelism']}{icons['spill']}{icons['skew']} [{severity:8}] {short_name}")
             report_lines.append("")
+            report_lines.append(f"**実行時間**: {node['duration_ms']:,}ms ({node['time_percentage']:.1f}% of total)")
+            report_lines.append(f"**重要度**: {severity}")
+            report_lines.append("")
+            report_lines.append("**📊 詳細メトリクス:**")
+            report_lines.append(f"- ⏱️  実行時間: {node['duration_ms']:>8,} ms ({node['duration_ms']/1000:>6.1f} sec)")
+            report_lines.append(f"- 📊 処理行数: {node['rows_processed']:>8,} 行")
+            report_lines.append(f"- 💾 ピークメモリ: {node['memory_mb']:>6.1f} MB")
             
+            # 並列度表示
+            parallelism_display = node['parallelism']['display']
+            if parallelism_display:
+                report_lines.append(f"- 🔧 並列度: {' | '.join(parallelism_display)}")
+            else:
+                report_lines.append(f"- 🔧 並列度: {node['parallelism']['num_tasks']:>3d} タスク")
+            
+            # スピル・スキュー状況
+            spill_status = "あり" if node['spill']['detected'] else "なし"
+            skew_status = node['skew']['status']
+            if node['skew']['status'] == "Detected & handled by AQE":
+                skew_status = "AQEで検出・処理済み"
+            elif node['skew']['status'] == "Potential skew possibility":
+                skew_status = "潜在的なスキューの可能性"
+            elif node['skew']['status'] == "None":
+                skew_status = "なし"
+            
+            report_lines.append(f"- 💿 スピル: {spill_status} | ⚖️ スキュー: {skew_status}")
+            
+            # AQEShuffleRead メトリクス表示
+            aqe_metrics = node['aqe_shuffle_metrics']
+            if aqe_metrics:
+                aqe_display = []
+                for aqe_metric in aqe_metrics:
+                    if aqe_metric['name'] == "AQEShuffleRead - Number of partitions":
+                        aqe_display.append(f"パーティション数: {aqe_metric['value']}")
+                    elif aqe_metric['name'] == "AQEShuffleRead - Partition data size":
+                        aqe_display.append(f"データサイズ: {aqe_metric['value']:,} bytes")
+                
+                if aqe_display:
+                    report_lines.append(f"- 🔄 AQEShuffleRead: {' | '.join(aqe_display)}")
+                    
+                    # 平均パーティションサイズと警告表示
+                    parallelism_data = node['parallelism']['data']
+                    avg_partition_size = parallelism_data.get('aqe_shuffle_avg_partition_size', 0)
+                    if avg_partition_size > 0:
+                        avg_size_mb = avg_partition_size / (1024 * 1024)
+                        report_lines.append(f"- 📊 平均パーティションサイズ: {avg_size_mb:.2f} MB")
+                        
+                        if parallelism_data.get('aqe_shuffle_skew_warning', False):
+                            report_lines.append(f"- ⚠️  **警告** 平均パーティションサイズが512MB以上 - 潜在的なスキューの可能性あり")
+            
+            # 処理効率
+            efficiency = node['processing_efficiency']['rows_per_sec']
+            if efficiency > 0:
+                report_lines.append(f"- 🚀 処理効率: {efficiency:>8,.0f} 行/秒")
+            
+            # フィルタ率表示
+            filter_analysis = node['filter_analysis']
+            filter_display = format_filter_rate_display(filter_analysis)
+            if filter_display:
+                report_lines.append(f"- {filter_display}")
+            elif filter_analysis["has_filter_metrics"]:
+                report_lines.append(f"- 📂 フィルタ率: {filter_analysis['filter_rate']:.1%} (読み込み: {filter_analysis['files_read_bytes']/(1024*1024*1024):.2f}GB, プルーン: {filter_analysis['files_pruned_bytes']/(1024*1024*1024):.2f}GB)")
+            
+            # スピル詳細
+            if node['spill']['detected'] and node['spill']['bytes'] > 0:
+                if node['spill']['mb'] >= 1024:
+                    spill_display = f"{node['spill']['gb']:.2f} GB"
+                else:
+                    spill_display = f"{node['spill']['mb']:.1f} MB"
+                report_lines.append(f"- 💿 スピル詳細: {spill_display}")
+            
+            # Shuffle属性（shuffleノード用）
+            if node['shuffle_attributes']:
+                report_lines.append(f"- 🔄 Shuffle属性: {', '.join(node['shuffle_attributes'])}")
+                
+                # 最適化提案
+                if node['optimization_suggestion']:
+                    suggestion = node['optimization_suggestion']
+                    report_lines.append(f"- 💡 **最適化提案**: REPARTITION({suggestion['suggested_partitions']}, {suggestion['columns']})")
+                    report_lines.append(f"  - **理由**: {suggestion['reason']}")
+                    report_lines.append(f"  - **対象**: {suggestion['target']}")
+            elif "shuffle" in node['raw_node_name'].lower():
+                report_lines.append(f"- 🔄 Shuffle属性: 設定なし")
+            
+            # クラスタリングキー（scanノード用）
+            if node['cluster_attributes']:
+                report_lines.append(f"- 📊 クラスタリングキー: {', '.join(node['cluster_attributes'])}")
+            elif "scan" in node['raw_node_name'].lower():
+                report_lines.append(f"- 📊 クラスタリングキー: 設定なし")
+            
+            # スキュー詳細
+            if node['skew']['detected'] and node['skew']['partitions'] > 0:
+                report_lines.append(f"- ⚖️ スキュー詳細: {node['skew']['partitions']} 個のスキューパーティション (AQEShuffleRead検出)")
+            
+            # ノードID
+            report_lines.append(f"- 🆔 ノードID: {node['node_id']}")
+            report_lines.append("")
     else:
         report_lines.append("⚠️ ノードメトリクスが見つかりませんでした")
+    
+    return "\n".join(report_lines)
+
+
+def _format_top10_report_en(analysis_data: Dict[str, Any], limit_nodes: int) -> str:
+    """英語版Top 10レポートフォーマッター"""
+    report_lines = []
+    report_lines.append("")
+    
+    summary = analysis_data['summary']
+    nodes = analysis_data['nodes']
+    
+    if nodes:
+        report_lines.append(f"📊 Cumulative task execution time (parallel): {summary['total_duration']:,} ms ({summary['total_duration']/3600000:.1f} hours)")
+        report_lines.append(f"📈 TOP{limit_nodes} total time (parallel execution): {summary['total_top_nodes_duration']:,} ms")
+        report_lines.append("")
+        
+        for node in nodes:
+            # 基本情報表示
+            icons = node['icons']
+            severity = node['severity']
+            short_name = node['short_name']
+            
+            report_lines.append(f"### {node['rank']}. {icons['time']}{icons['memory']}{icons['parallelism']}{icons['spill']}{icons['skew']} [{severity:8}] {short_name}")
+            report_lines.append("")
+            report_lines.append(f"**Execution Time**: {node['duration_ms']:,}ms ({node['time_percentage']:.1f}% of total)")
+            report_lines.append(f"**Severity**: {severity}")
+            report_lines.append("")
+            report_lines.append("**📊 Detailed Metrics:**")
+            report_lines.append(f"- ⏱️  Execution time: {node['duration_ms']:>8,} ms ({node['duration_ms']/1000:>6.1f} sec)")
+            report_lines.append(f"- 📊 Rows processed: {node['rows_processed']:>8,} rows")
+            report_lines.append(f"- 💾 Peak memory: {node['memory_mb']:>6.1f} MB")
+            
+            # 並列度表示
+            parallelism_display = node['parallelism']['display']
+            if parallelism_display:
+                report_lines.append(f"- 🔧 Parallelism: {' | '.join(parallelism_display)}")
+            else:
+                report_lines.append(f"- 🔧 Parallelism: {node['parallelism']['num_tasks']:>3d} tasks")
+            
+            # スピル・スキュー状況
+            spill_status = "Yes" if node['spill']['detected'] else "No"
+            skew_status = node['skew']['status']
+            
+            report_lines.append(f"- 💿 Spill: {spill_status} | ⚖️ Skew: {skew_status}")
+            
+            # AQEShuffleRead メトリクス表示
+            aqe_metrics = node['aqe_shuffle_metrics']
+            if aqe_metrics:
+                aqe_display = []
+                for aqe_metric in aqe_metrics:
+                    if aqe_metric['name'] == "AQEShuffleRead - Number of partitions":
+                        aqe_display.append(f"Partitions: {aqe_metric['value']}")
+                    elif aqe_metric['name'] == "AQEShuffleRead - Partition data size":
+                        aqe_display.append(f"Data size: {aqe_metric['value']:,} bytes")
+                
+                if aqe_display:
+                    report_lines.append(f"- 🔄 AQEShuffleRead: {' | '.join(aqe_display)}")
+                    
+                    # 平均パーティションサイズと警告表示
+                    parallelism_data = node['parallelism']['data']
+                    avg_partition_size = parallelism_data.get('aqe_shuffle_avg_partition_size', 0)
+                    if avg_partition_size > 0:
+                        avg_size_mb = avg_partition_size / (1024 * 1024)
+                        report_lines.append(f"- 📊 Average partition size: {avg_size_mb:.2f} MB")
+                        
+                        if parallelism_data.get('aqe_shuffle_skew_warning', False):
+                            report_lines.append(f"- ⚠️  **WARNING** Average partition size exceeds 512MB - Potential skew possibility")
+            
+            # 処理効率
+            efficiency = node['processing_efficiency']['rows_per_sec']
+            if efficiency > 0:
+                report_lines.append(f"- 🚀 Processing efficiency: {efficiency:>8,.0f} rows/sec")
+            
+            # フィルタ率表示
+            filter_analysis = node['filter_analysis']
+            filter_display = format_filter_rate_display(filter_analysis)
+            if filter_display:
+                report_lines.append(f"- {filter_display}")
+            elif filter_analysis["has_filter_metrics"]:
+                report_lines.append(f"- 📂 Filter rate: {filter_analysis['filter_rate']:.1%} (read: {filter_analysis['files_read_bytes']/(1024*1024*1024):.2f}GB, pruned: {filter_analysis['files_pruned_bytes']/(1024*1024*1024):.2f}GB)")
+            
+            # スピル詳細
+            if node['spill']['detected'] and node['spill']['bytes'] > 0:
+                if node['spill']['mb'] >= 1024:
+                    spill_display = f"{node['spill']['gb']:.2f} GB"
+                else:
+                    spill_display = f"{node['spill']['mb']:.1f} MB"
+                report_lines.append(f"- 💿 Spill details: {spill_display}")
+            
+            # Shuffle属性（shuffleノード用）
+            if node['shuffle_attributes']:
+                report_lines.append(f"- 🔄 Shuffle attributes: {', '.join(node['shuffle_attributes'])}")
+                
+                # 最適化提案
+                if node['optimization_suggestion']:
+                    suggestion = node['optimization_suggestion']
+                    report_lines.append(f"- 💡 **Optimization suggestion**: REPARTITION({suggestion['suggested_partitions']}, {suggestion['columns']})")
+                    report_lines.append(f"  - **Reason**: {suggestion['reason']}")
+                    report_lines.append(f"  - **Target**: {suggestion['target']}")
+            elif "shuffle" in node['raw_node_name'].lower():
+                report_lines.append(f"- 🔄 Shuffle attributes: Not configured")
+            
+            # クラスタリングキー（scanノード用）
+            if node['cluster_attributes']:
+                report_lines.append(f"- 📊 Clustering keys: {', '.join(node['cluster_attributes'])}")
+            elif "scan" in node['raw_node_name'].lower():
+                report_lines.append(f"- 📊 Clustering keys: Not configured")
+            
+            # スキュー詳細
+            if node['skew']['detected'] and node['skew']['partitions'] > 0:
+                report_lines.append(f"- ⚖️ Skew details: {node['skew']['partitions']} skewed partitions (AQEShuffleRead detection)")
+            
+            # ノードID
+            report_lines.append(f"- 🆔 Node ID: {node['node_id']}")
+            report_lines.append("")
+    else:
+        report_lines.append("⚠️ No node metrics found")
     
     return "\n".join(report_lines)
 
