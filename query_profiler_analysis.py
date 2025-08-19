@@ -303,6 +303,7 @@ print(f"⚙️ Shuffle analysis enabled: {SHUFFLE_ANALYSIS_CONFIG['shuffle_analy
 try:
     import atexit
     import os as _os_for_cleanup
+    from typing import List, Dict, Any, Optional
 
     def _cleanup_text_files_when_debug_disabled() -> None:
         debug_flag = str(globals().get('DEBUG_ENABLED', 'N')).upper()
