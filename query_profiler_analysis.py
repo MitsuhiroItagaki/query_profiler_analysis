@@ -676,14 +676,14 @@ def generate_unified_top10_analysis_data(
         # 時間パーセンテージ計算（デグレ防止）
         time_percentage = min((duration_ms / max(total_duration, 1)) * 100, 100.0)
         
-        # 重要度とアイコン
-        if duration_ms >= 10000:
+        # 重要度とアイコン（時間パーセンテージベース）
+        if time_percentage >= 20.0:
             severity = "CRITICAL"
             time_icon = "🔴"
-        elif duration_ms >= 5000:
+        elif time_percentage >= 10.0:
             severity = "HIGH"
             time_icon = "🟠"
-        elif duration_ms >= 1000:
+        elif time_percentage >= 5.0:
             severity = "MEDIUM"
             time_icon = "🟡"
         else:
@@ -2194,7 +2194,7 @@ def extract_detailed_bottleneck_analysis(extracted_metrics: Dict[str, Any], enha
             "aqe_shuffle_skew_warning": aqe_shuffle_skew_warning,  # AQEShuffleRead平均パーティションサイズ警告
             "skewed_partitions": skewed_partitions,
             "is_shuffle_node": "shuffle" in node_name.lower(),
-            "severity": "CRITICAL" if duration_ms >= 10000 else "HIGH" if duration_ms >= 5000 else "MEDIUM" if duration_ms >= 1000 else "LOW"
+            "severity": "CRITICAL" if time_percentage >= 20.0 else "HIGH" if time_percentage >= 10.0 else "MEDIUM" if time_percentage >= 5.0 else "LOW"
         }
         
         # REPARTITIONヒントの付与条件を拡張
@@ -4844,8 +4844,8 @@ def analyze_bottlenecks_with_llm(metrics: Dict[str, Any]) -> str:
         # パーセンテージ計算（100%を上限とする）
         percentage = min((duration_ms / max(total_time_ms, 1)) * 100, 100.0)
         
-        # ボトルネックの重要度判定
-        severity = "CRITICAL" if duration_ms >= 10000 else "HIGH" if duration_ms >= 5000 else "MEDIUM"
+        # ボトルネックの重要度判定（時間パーセンテージベース）
+        severity = "CRITICAL" if percentage >= 20.0 else "HIGH" if percentage >= 10.0 else "MEDIUM" if percentage >= 5.0 else "LOW"
         
         # 意味のあるノード名を取得
         node_name = get_meaningful_node_name(node, metrics)
@@ -5002,13 +5002,13 @@ def analyze_bottlenecks_with_llm(metrics: Dict[str, Any]) -> str:
         time_percentage = min((duration_ms / max(total_time_ms, 1)) * 100, 100.0)
         
         # Icons based on severity
-        if duration_ms >= 10000:  # 10+ seconds
+        if time_percentage >= 20.0:  # 20%+ of total time
             time_icon = "🔴"
             severity = "CRITICAL"
-        elif duration_ms >= 5000:  # 5+ seconds
+        elif time_percentage >= 10.0:  # 10%+ of total time
             time_icon = "🟠"
             severity = "HIGH"
-        elif duration_ms >= 1000:  # 1+ seconds
+        elif time_percentage >= 5.0:  # 5%+ of total time
             time_icon = "🟡"
             severity = "MEDIUM"
         else:
@@ -6415,13 +6415,13 @@ if final_sorted_nodes:
         time_percentage = min((duration_ms / max(total_duration, 1)) * 100, 100.0)
         
         # 時間の重要度に基づいてアイコンを選択
-        if duration_ms >= 10000:  # 10秒以上
+        if time_percentage >= 20.0:  # 20%以上の実行時間
             time_icon = "�"
             severity = "CRITICAL"
-        elif duration_ms >= 5000:  # 5秒以上
+        elif time_percentage >= 10.0:  # 10%以上の実行時間
             time_icon = "🟠"
             severity = "HIGH"
-        elif duration_ms >= 1000:  # 1秒以上
+        elif time_percentage >= 5.0:  # 5%以上の実行時間
             time_icon = "🟡"
             severity = "MEDIUM"
         else:
@@ -6823,13 +6823,13 @@ if extracted_metrics['stage_metrics']:
         parallelism_icon = "🔥" if num_tasks >= 10 else "⚠️" if num_tasks >= 5 else "🐌"
         
         # 実行時間の重要度
-        if duration_ms >= 10000:
+        if time_percentage >= 20.0:
             time_icon = "🔴"
             severity = "CRITICAL"
-        elif duration_ms >= 5000:
+        elif time_percentage >= 10.0:
             time_icon = "🟠"
             severity = "HIGH"
-        elif duration_ms >= 1000:
+        elif time_percentage >= 5.0:
             time_icon = "🟡"
             severity = "MEDIUM"
         else:
@@ -9831,13 +9831,13 @@ def generate_top10_time_consuming_processes_data(extracted_metrics: Dict[str, An
             time_percentage = min((duration_ms / max(total_duration, 1)) * 100, 100.0)
             
             # 時間の重要度に基づいてアイコンを選択
-            if duration_ms >= 10000:  # 10秒以上
+            if time_percentage >= 20.0:  # 20%以上の実行時間
                 time_icon = "🔴"
                 severity = "CRITICAL"
-            elif duration_ms >= 5000:  # 5秒以上
+            elif time_percentage >= 10.0:  # 10%以上の実行時間
                 time_icon = "🟠"
                 severity = "HIGH"
-            elif duration_ms >= 1000:  # 1秒以上
+            elif time_percentage >= 5.0:  # 5%以上の実行時間
                 time_icon = "🟡"
                 severity = "MEDIUM"
             else:
@@ -12343,13 +12343,13 @@ The following topics are analyzed for process evaluation:
                 time_percentage = min((duration_ms / max(total_time_ms_en, 1)) * 100, 100.0)
                 
                 # Icons based on severity
-                if duration_ms >= 10000:  # 10+ seconds
+                if time_percentage >= 20.0:  # 20%+ of total time
                     time_icon = "🔴"
                     severity = "CRITICAL"
-                elif duration_ms >= 5000:  # 5+ seconds
+                elif time_percentage >= 10.0:  # 10%+ of total time
                     time_icon = "🟠"
                     severity = "HIGH"
-                elif duration_ms >= 1000:  # 1+ seconds
+                elif time_percentage >= 5.0:  # 5%+ of total time
                     time_icon = "🟡"
                     severity = "MEDIUM"
                 else:
