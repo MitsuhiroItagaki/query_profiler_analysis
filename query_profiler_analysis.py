@@ -4648,255 +4648,9 @@ def analyze_bottlenecks_with_llm(metrics: Dict[str, Any]) -> str:
     report_lines.append("## 3. TOP5 Processing Time Bottlenecks")
     report_lines.append("")
     
-    # Generate detailed process information for each critical process (same logic as cell 37)
-    for i, node in enumerate(sorted_nodes):
-        # Extract detailed information (same logic as cell 37)
-        rows_num = node['key_metrics'].get('rowsNum', 0)
-        duration_ms = node['key_metrics'].get('durationMs', 0)
-        memory_mb = node['key_metrics'].get('peakMemoryBytes', 0) / 1024 / 1024
-        
-        # Time percentage calculation
-        time_percentage = min((duration_ms / max(total_time_ms, 1)) * 100, 100.0)
-        
-        # Icons based on severity
-        if duration_ms >= 10000:  # 10+ seconds
-            time_icon = "🔴"
-            severity = "CRITICAL"
-        elif duration_ms >= 5000:  # 5+ seconds
-            time_icon = "🟠"
-            severity = "HIGH"
-        elif duration_ms >= 1000:  # 1+ seconds
-            time_icon = "🟡"
-            severity = "MEDIUM"
-        else:
-            time_icon = "🟢"
-            severity = "LOW"
-        
-        # Memory usage icon
-        memory_icon = "💚" if memory_mb < 100 else "⚠️" if memory_mb < 1000 else "🚨"
-        
-        # Get parallelism data
-        parallelism_data = extract_parallelism_metrics(node)
-        num_tasks = parallelism_data.get('tasks_total', 0)
-        
-        # Fallback for tasks
-        if num_tasks == 0:
-            if parallelism_data.get('sink_tasks_total', 0) > 0:
-                num_tasks = parallelism_data.get('sink_tasks_total', 0)
-            elif parallelism_data.get('source_tasks_total', 0) > 0:
-                num_tasks = parallelism_data.get('source_tasks_total', 0)
-        
-        # Parallelism icon
-        parallelism_icon = "🔥" if num_tasks >= 10 else "⚠️" if num_tasks >= 5 else "🐌"
-        
-        # Spill detection (same logic as cell 37)
-        spill_detected = False
-        spill_bytes = 0
-        exact_spill_metrics = [
-            "Num bytes spilled to disk due to memory pressure",
-            "Sink - Num bytes spilled to disk due to memory pressure",
-            "Sink/Num bytes spilled to disk due to memory pressure"
-        ]
-        
-        # Search in detailed_metrics
-        detailed_metrics = node.get('detailed_metrics', {})
-        for metric_key, metric_info in detailed_metrics.items():
-            metric_value = metric_info.get('value', 0)
-            metric_label = metric_info.get('label', '')
-            
-            if (metric_key in exact_spill_metrics or metric_label in exact_spill_metrics) and metric_value > 0:
-                spill_detected = True
-                spill_bytes = max(spill_bytes, metric_value)
-                break
-        
-        # Search in raw_metrics if not found
-        if not spill_detected:
-            raw_metrics = node.get('metrics', [])
-            for metric in raw_metrics:
-                metric_key = metric.get('key', '')
-                metric_label = metric.get('label', '')
-                metric_value = metric.get('value', 0)
-                
-                if (metric_key in exact_spill_metrics or metric_label in exact_spill_metrics) and metric_value > 0:
-                    spill_detected = True
-                    spill_bytes = max(spill_bytes, metric_value)
-                    break
-        
-        # Spill icon
-        spill_icon = "💿" if spill_detected else "✅"
-        
-        # Skew detection (AQE-based)
-        skew_detected = False
-        skewed_partitions = 0
-        target_skew_metric = "AQEShuffleRead - Number of skewed partitions"
-        
-        # Search in detailed_metrics
-        for metric_key, metric_info in detailed_metrics.items():
-            if metric_key == target_skew_metric:
-                try:
-                    skewed_partitions = int(metric_info.get('value', 0))
-                    if skewed_partitions > 0:
-                        skew_detected = True
-                    break
-                except (ValueError, TypeError):
-                    continue
-        
-        # Search in key_metrics if not found
-        if not skew_detected:
-            key_metrics = node.get('key_metrics', {})
-            if target_skew_metric in key_metrics:
-                try:
-                    skewed_partitions = int(key_metrics[target_skew_metric])
-                    if skewed_partitions > 0:
-                        skew_detected = True
-                except (ValueError, TypeError):
-                    pass
-        
-        # Skew icon
-        skew_icon = "⚖️" if skew_detected else "✅"
-        
-        # Get meaningful node name
-        raw_node_name = node['name']
-        node_name = get_meaningful_node_name(node, metrics)
-        short_name = node_name[:100] + "..." if len(node_name) > 100 else node_name
-        
-        # Generate detailed output
-        report_lines.append(f"### {i+1}. {time_icon}{memory_icon}{parallelism_icon}{spill_icon}{skew_icon} [{severity:8}] {short_name}")
-        report_lines.append("")
-        report_lines.append(f"**実行時間**: {duration_ms:,}ms ({time_percentage:.1f}% of total)")
-        report_lines.append(f"**重要度**: {severity}")
-        report_lines.append("")
-        report_lines.append("**📊 詳細メトリクス:**")
-        report_lines.append(f"- ⏱️  実行時間: {duration_ms:>8,} ms ({duration_ms/1000:>6.1f} sec)")
-        report_lines.append(f"- 📊 処理行数: {rows_num:>8,} 行")
-        report_lines.append(f"- 💾 ピークメモリ: {memory_mb:>6.1f} MB")
-        
-        # Display multiple Tasks total metrics
-        parallelism_display = []
-        for task_metric in parallelism_data.get('all_tasks_metrics', []):
-            parallelism_display.append(f"{task_metric['name']}: {task_metric['value']}")
-        
-        if parallelism_display:
-            report_lines.append(f"- 🔧 並列度: {' | '.join(parallelism_display)}")
-        else:
-            report_lines.append(f"- 🔧 並列度: {num_tasks:>3d} タスク")
-        
-        # Skew status
-        aqe_shuffle_skew_warning = parallelism_data.get('aqe_shuffle_skew_warning', False)
-        
-        if skew_detected:
-            skew_status = "AQEで検出・対応済"
-        elif aqe_shuffle_skew_warning:
-            skew_status = "潜在的なスキューの可能性あり"
-        else:
-            skew_status = "なし"
-        
-        report_lines.append(f"- 💿 スピル: {'あり' if spill_detected else 'なし'} | ⚖️ スキュー: {skew_status}")
-        
-        # AQEShuffleRead metrics display
-        aqe_shuffle_metrics = parallelism_data.get('aqe_shuffle_metrics', [])
-        if aqe_shuffle_metrics:
-            aqe_display = []
-            for aqe_metric in aqe_shuffle_metrics:
-                if aqe_metric['name'] == "AQEShuffleRead - Number of partitions":
-                    aqe_display.append(f"パーティション数: {aqe_metric['value']}")
-                elif aqe_metric['name'] == "AQEShuffleRead - Partition data size":
-                    aqe_display.append(f"データサイズ: {aqe_metric['value']:,} bytes")
-            
-            if aqe_display:
-                report_lines.append(f"- 🔄 AQEShuffleRead: {' | '.join(aqe_display)}")
-                
-                # Average partition size and warning display
-                avg_partition_size = parallelism_data.get('aqe_shuffle_avg_partition_size', 0)
-                if avg_partition_size > 0:
-                    avg_size_mb = avg_partition_size / (1024 * 1024)
-                    report_lines.append(f"- 📊 平均パーティションサイズ: {avg_size_mb:.2f} MB")
-                    
-                    # Warning when 512MB or more
-                    if parallelism_data.get('aqe_shuffle_skew_warning', False):
-                        report_lines.append(f"- ⚠️  **警告** 平均パーティションサイズが512MB以上 - 潜在的なスキューの可能性あり")
-        
-        # Processing efficiency calculation
-        if duration_ms > 0:
-            rows_per_sec = (rows_num * 1000) / duration_ms
-            report_lines.append(f"- 🚀 処理効率: {rows_per_sec:>8,.0f} 行/秒")
-        
-        # Filter rate display
-        filter_result = calculate_filter_rate(node)
-        filter_display = format_filter_rate_display(filter_result)
-        if filter_display:
-            report_lines.append(f"- {filter_display}")
-        else:
-            if filter_result["has_filter_metrics"]:
-                report_lines.append(f"- 📂 フィルタ率: {filter_result['filter_rate']:.1%} (読み込み: {filter_result['files_read_bytes']/(1024*1024*1024):.2f}GB, プルーン: {filter_result['files_pruned_bytes']/(1024*1024*1024):.2f}GB)")
-        
-        # Spill details (simple display)
-        if spill_detected and spill_bytes > 0:
-            spill_mb = spill_bytes / 1024 / 1024
-            if spill_mb >= 1024:  # GB unit
-                spill_display = f"{spill_mb/1024:.2f} GB"
-            else:  # MB unit
-                spill_display = f"{spill_mb:.1f} MB"
-            report_lines.append(f"- 💿 スピル詳細: {spill_display}")
-        
-        # Shuffle attributes for shuffle nodes
-        if "shuffle" in raw_node_name.lower():
-            shuffle_attributes = extract_shuffle_attributes(node)
-            if shuffle_attributes:
-                report_lines.append(f"- 🔄 Shuffle属性: {', '.join(shuffle_attributes)}")
-                
-                # REPARTITION suggestion (only when spill is detected)
-                if spill_detected and spill_bytes > 0:
-                    # Memory-based calculation (same logic as repartition_optimizer.py)
-                    memory_per_partition_threshold_mb = 512
-                    memory_per_partition_threshold_bytes = 512 * 1024 * 1024
-                    
-                    peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
-                    
-                    # Get current partition count
-                    current_partitions = num_tasks  # fallback value
-                    
-                    # Get more accurate partition count
-                    for metric_name in ["Sink - Number of partitions", "Number of partitions", "AQEShuffleRead - Number of partitions"]:
-                        if metric_name in detailed_metrics:
-                            current_partitions = detailed_metrics[metric_name].get('value', current_partitions)
-                            break
-                    
-                    # Memory-based accurate calculation
-                    if peak_memory_bytes > 0 and current_partitions > 0:
-                        memory_per_partition = peak_memory_bytes / current_partitions
-                        if memory_per_partition > memory_per_partition_threshold_bytes:
-                            suggested_partitions = int(round(peak_memory_bytes / memory_per_partition_threshold_bytes))
-                        else:
-                            suggested_partitions = current_partitions
-                    else:
-                        # Fallback: conventional logic
-                        suggested_partitions = max(num_tasks * 2, 100)
-                    
-                    # Use all detected shuffle attribute columns
-                    repartition_columns = ", ".join(shuffle_attributes)
-                    
-                    report_lines.append(f"- 💡 **最適化提案**: REPARTITION({suggested_partitions}, {repartition_columns})")
-                    report_lines.append(f"  - **理由**: スピル({spill_mb:.1f} MB)を改善するため")
-                    report_lines.append(f"  - **対象**: Shuffle属性全{len(shuffle_attributes)}カラムを完全使用")
-            else:
-                report_lines.append(f"- 🔄 Shuffle属性: 設定なし")
-        
-        # Clustering keys for scan nodes
-        if "scan" in raw_node_name.lower():
-            cluster_attributes = extract_cluster_attributes(node)
-            if cluster_attributes:
-                report_lines.append(f"- 📊 クラスタリングキー: {', '.join(cluster_attributes)}")
-            else:
-                report_lines.append(f"- 📊 クラスタリングキー: 設定なし")
-        
-        # Skew details
-        if skew_detected and skewed_partitions > 0:
-            report_lines.append(f"- ⚖️ スキュー詳細: {skewed_partitions} 個のスキューパーティション (AQEShuffleRead検出)")
-        
-        # Node ID
-        report_lines.append(f"- 🆔 ノードID: {node.get('node_id', node.get('id', 'N/A'))}")
-        report_lines.append("")
+    # Use unified detailed analysis function
+    detailed_lines = generate_detailed_top_processes_analysis(metrics, 5, 'ja')
+    report_lines.extend(detailed_lines)
     
     # Liquid Clustering Recommendations
     report_lines.append("## 4. Liquid Clustering Recommendations")
@@ -6017,6 +5771,385 @@ def convert_sets_to_lists(obj):
         return obj
 
 # output_extracted_metrics の生成は除外（不要）
+
+def generate_detailed_top_processes_analysis(metrics: Dict[str, Any], limit_nodes: int = 5, output_language: str = 'ja') -> List[str]:
+    """
+    統一された詳細TOP処理分析を生成（セル37と同じロジック）
+    
+    Args:
+        metrics: 抽出されたメトリクス
+        limit_nodes: 表示するノード数（デフォルト5）
+        output_language: 出力言語 ('ja' または 'en')
+    
+    Returns:
+        List[str]: 詳細分析結果の行リスト
+    """
+    report_lines = []
+    
+    # TOP処理分析情報の取得
+    all_sorted_nodes = sorted(metrics['node_metrics'], 
+                             key=lambda x: x['key_metrics'].get('durationMs', 0), 
+                             reverse=True)
+    
+    # 指定されたノード数まで処理
+    sorted_nodes = all_sorted_nodes[:limit_nodes]
+    
+    # 正しい全体時間の計算
+    overall_metrics = metrics.get('overall_metrics', {})
+    total_time_ms = overall_metrics.get('total_time_ms', 0)
+    
+    # 並列実行問題の修正: task_total_time_msを優先使用
+    task_total_time_ms = overall_metrics.get('task_total_time_ms', 0)
+    
+    if task_total_time_ms > 0:
+        total_time_ms = task_total_time_ms
+    elif total_time_ms <= 0:
+        execution_time_ms = overall_metrics.get('execution_time_ms', 0)
+        if execution_time_ms > 0:
+            total_time_ms = execution_time_ms
+        else:
+            max_node_time = max([node['key_metrics'].get('durationMs', 0) for node in all_sorted_nodes], default=1)
+            total_time_ms = int(max_node_time * 1.2)
+    
+    # Generate detailed process information for each process (same logic as cell 37)
+    for i, node in enumerate(sorted_nodes):
+        # Extract detailed information (same logic as cell 37)
+        rows_num = node['key_metrics'].get('rowsNum', 0)
+        duration_ms = node['key_metrics'].get('durationMs', 0)
+        memory_mb = node['key_metrics'].get('peakMemoryBytes', 0) / 1024 / 1024
+        
+        # Time percentage calculation
+        time_percentage = min((duration_ms / max(total_time_ms, 1)) * 100, 100.0)
+        
+        # Icons based on severity
+        if duration_ms >= 10000:  # 10+ seconds
+            time_icon = "🔴"
+            severity = "CRITICAL"
+        elif duration_ms >= 5000:  # 5+ seconds
+            time_icon = "🟠"
+            severity = "HIGH"
+        elif duration_ms >= 1000:  # 1+ seconds
+            time_icon = "🟡"
+            severity = "MEDIUM"
+        else:
+            time_icon = "🟢"
+            severity = "LOW"
+        
+        # Memory usage icon
+        memory_icon = "💚" if memory_mb < 100 else "⚠️" if memory_mb < 1000 else "🚨"
+        
+        # Get parallelism data
+        parallelism_data = extract_parallelism_metrics(node)
+        num_tasks = parallelism_data.get('tasks_total', 0)
+        
+        # Fallback for tasks
+        if num_tasks == 0:
+            if parallelism_data.get('sink_tasks_total', 0) > 0:
+                num_tasks = parallelism_data.get('sink_tasks_total', 0)
+            elif parallelism_data.get('source_tasks_total', 0) > 0:
+                num_tasks = parallelism_data.get('source_tasks_total', 0)
+        
+        # Parallelism icon
+        parallelism_icon = "🔥" if num_tasks >= 10 else "⚠️" if num_tasks >= 5 else "🐌"
+        
+        # Spill detection (same logic as cell 37)
+        spill_detected = False
+        spill_bytes = 0
+        exact_spill_metrics = [
+            "Num bytes spilled to disk due to memory pressure",
+            "Sink - Num bytes spilled to disk due to memory pressure",
+            "Sink/Num bytes spilled to disk due to memory pressure"
+        ]
+        
+        # Search in detailed_metrics
+        detailed_metrics = node.get('detailed_metrics', {})
+        for metric_key, metric_info in detailed_metrics.items():
+            metric_value = metric_info.get('value', 0)
+            metric_label = metric_info.get('label', '')
+            
+            if (metric_key in exact_spill_metrics or metric_label in exact_spill_metrics) and metric_value > 0:
+                spill_detected = True
+                spill_bytes = max(spill_bytes, metric_value)
+                break
+        
+        # Search in raw_metrics if not found
+        if not spill_detected:
+            raw_metrics = node.get('metrics', [])
+            for metric in raw_metrics:
+                metric_key = metric.get('key', '')
+                metric_label = metric.get('label', '')
+                metric_value = metric.get('value', 0)
+                
+                if (metric_key in exact_spill_metrics or metric_label in exact_spill_metrics) and metric_value > 0:
+                    spill_detected = True
+                    spill_bytes = max(spill_bytes, metric_value)
+                    break
+        
+        # Spill icon
+        spill_icon = "💿" if spill_detected else "✅"
+        
+        # Skew detection (AQE-based)
+        skew_detected = False
+        skewed_partitions = 0
+        target_skew_metric = "AQEShuffleRead - Number of skewed partitions"
+        
+        # Search in detailed_metrics
+        for metric_key, metric_info in detailed_metrics.items():
+            if metric_key == target_skew_metric:
+                try:
+                    skewed_partitions = int(metric_info.get('value', 0))
+                    if skewed_partitions > 0:
+                        skew_detected = True
+                    break
+                except (ValueError, TypeError):
+                    continue
+        
+        # Search in key_metrics if not found
+        if not skew_detected:
+            key_metrics = node.get('key_metrics', {})
+            if target_skew_metric in key_metrics:
+                try:
+                    skewed_partitions = int(key_metrics[target_skew_metric])
+                    if skewed_partitions > 0:
+                        skew_detected = True
+                except (ValueError, TypeError):
+                    pass
+        
+        # Skew icon
+        skew_icon = "⚖️" if skew_detected else "✅"
+        
+        # Get meaningful node name
+        raw_node_name = node['name']
+        node_name = get_meaningful_node_name(node, metrics)
+        short_name = node_name[:100] + "..." if len(node_name) > 100 else node_name
+        
+        # Language-specific labels
+        if output_language == 'ja':
+            execution_time_label = "実行時間"
+            severity_label = "重要度"
+            detailed_metrics_label = "詳細メトリクス"
+            execution_time_detail = "実行時間"
+            rows_processed_label = "処理行数"
+            peak_memory_label = "ピークメモリ"
+            parallelism_label = "並列度"
+            tasks_label = "タスク"
+            spill_label = "スピル"
+            skew_label = "スキュー"
+            spill_yes = "あり"
+            spill_no = "なし"
+            skew_detected_aqe = "AQEで検出・対応済"
+            skew_potential = "潜在的なスキューの可能性あり"
+            skew_none = "なし"
+            partitions_label = "パーティション数"
+            data_size_label = "データサイズ"
+            avg_partition_size_label = "平均パーティションサイズ"
+            warning_label = "警告"
+            warning_msg = "平均パーティションサイズが512MB以上 - 潜在的なスキューの可能性あり"
+            processing_efficiency_label = "処理効率"
+            rows_sec_unit = "行/秒"
+            filter_rate_label = "フィルタ率"
+            read_label = "読み込み"
+            pruned_label = "プルーン"
+            spill_details_label = "スピル詳細"
+            shuffle_attributes_label = "Shuffle属性"
+            optimization_suggestion_label = "最適化提案"
+            reason_label = "理由"
+            target_label = "対象"
+            reason_spill_improve = "を改善するため"
+            target_complete_use = "カラムを完全使用"
+            not_configured = "設定なし"
+            clustering_keys_label = "クラスタリングキー"
+            skew_details_label = "スキュー詳細"
+            skew_partitions_detected = "個のスキューパーティション (AQEShuffleRead検出)"
+            node_id_label = "ノードID"
+        else:
+            execution_time_label = "Execution Time"
+            severity_label = "Severity"
+            detailed_metrics_label = "Detailed Metrics"
+            execution_time_detail = "Execution time"
+            rows_processed_label = "Rows processed"
+            peak_memory_label = "Peak memory"
+            parallelism_label = "Parallelism"
+            tasks_label = "tasks"
+            spill_label = "Spill"
+            skew_label = "Skew"
+            spill_yes = "Yes"
+            spill_no = "No"
+            skew_detected_aqe = "Detected & handled by AQE"
+            skew_potential = "Potential skew possibility"
+            skew_none = "None"
+            partitions_label = "Partitions"
+            data_size_label = "Data size"
+            avg_partition_size_label = "Average partition size"
+            warning_label = "WARNING"
+            warning_msg = "Average partition size exceeds 512MB - Potential skew possibility"
+            processing_efficiency_label = "Processing efficiency"
+            rows_sec_unit = "rows/sec"
+            filter_rate_label = "Filter rate"
+            read_label = "read"
+            pruned_label = "pruned"
+            spill_details_label = "Spill details"
+            shuffle_attributes_label = "Shuffle attributes"
+            optimization_suggestion_label = "Optimization suggestion"
+            reason_label = "Reason"
+            target_label = "Target"
+            reason_spill_improve = ""
+            target_complete_use = "shuffle attribute columns"
+            not_configured = "Not configured"
+            clustering_keys_label = "Clustering keys"
+            skew_details_label = "Skew details"
+            skew_partitions_detected = "skewed partitions (AQEShuffleRead detection)"
+            node_id_label = "Node ID"
+        
+        # Generate detailed output
+        report_lines.append(f"### {i+1}. {time_icon}{memory_icon}{parallelism_icon}{spill_icon}{skew_icon} [{severity:8}] {short_name}")
+        report_lines.append("")
+        report_lines.append(f"**{execution_time_label}**: {duration_ms:,}ms ({time_percentage:.1f}% of total)")
+        report_lines.append(f"**{severity_label}**: {severity}")
+        report_lines.append("")
+        report_lines.append(f"**📊 {detailed_metrics_label}:**")
+        report_lines.append(f"- ⏱️  {execution_time_detail}: {duration_ms:>8,} ms ({duration_ms/1000:>6.1f} sec)")
+        report_lines.append(f"- 📊 {rows_processed_label}: {rows_num:>8,} {'rows' if output_language == 'en' else '行'}")
+        report_lines.append(f"- 💾 {peak_memory_label}: {memory_mb:>6.1f} MB")
+        
+        # Display multiple Tasks total metrics
+        parallelism_display = []
+        for task_metric in parallelism_data.get('all_tasks_metrics', []):
+            parallelism_display.append(f"{task_metric['name']}: {task_metric['value']}")
+        
+        if parallelism_display:
+            report_lines.append(f"- 🔧 {parallelism_label}: {' | '.join(parallelism_display)}")
+        else:
+            report_lines.append(f"- 🔧 {parallelism_label}: {num_tasks:>3d} {tasks_label}")
+        
+        # Skew status
+        aqe_shuffle_skew_warning = parallelism_data.get('aqe_shuffle_skew_warning', False)
+        
+        if skew_detected:
+            skew_status = skew_detected_aqe
+        elif aqe_shuffle_skew_warning:
+            skew_status = skew_potential
+        else:
+            skew_status = skew_none
+        
+        report_lines.append(f"- 💿 {spill_label}: {spill_yes if spill_detected else spill_no} | ⚖️ {skew_label}: {skew_status}")
+        
+        # AQEShuffleRead metrics display
+        aqe_shuffle_metrics = parallelism_data.get('aqe_shuffle_metrics', [])
+        if aqe_shuffle_metrics:
+            aqe_display = []
+            for aqe_metric in aqe_shuffle_metrics:
+                if aqe_metric['name'] == "AQEShuffleRead - Number of partitions":
+                    aqe_display.append(f"{partitions_label}: {aqe_metric['value']}")
+                elif aqe_metric['name'] == "AQEShuffleRead - Partition data size":
+                    aqe_display.append(f"{data_size_label}: {aqe_metric['value']:,} bytes")
+            
+            if aqe_display:
+                report_lines.append(f"- 🔄 AQEShuffleRead: {' | '.join(aqe_display)}")
+                
+                # Average partition size and warning display
+                avg_partition_size = parallelism_data.get('aqe_shuffle_avg_partition_size', 0)
+                if avg_partition_size > 0:
+                    avg_size_mb = avg_partition_size / (1024 * 1024)
+                    report_lines.append(f"- 📊 {avg_partition_size_label}: {avg_size_mb:.2f} MB")
+                    
+                    # Warning when 512MB or more
+                    if parallelism_data.get('aqe_shuffle_skew_warning', False):
+                        report_lines.append(f"- ⚠️  **{warning_label}** {warning_msg}")
+        
+        # Processing efficiency calculation
+        if duration_ms > 0:
+            rows_per_sec = (rows_num * 1000) / duration_ms
+            report_lines.append(f"- 🚀 {processing_efficiency_label}: {rows_per_sec:>8,.0f} {rows_sec_unit}")
+        
+        # Filter rate display
+        filter_result = calculate_filter_rate(node)
+        filter_display = format_filter_rate_display(filter_result)
+        if filter_display:
+            if output_language == 'en':
+                # Translate filter display to English
+                filter_display_en = filter_display.replace("フィルタ率", "Filter rate").replace("読み込み", "read").replace("プルーン", "pruned")
+                report_lines.append(f"- {filter_display_en}")
+            else:
+                report_lines.append(f"- {filter_display}")
+        else:
+            if filter_result["has_filter_metrics"]:
+                report_lines.append(f"- 📂 {filter_rate_label}: {filter_result['filter_rate']:.1%} ({read_label}: {filter_result['files_read_bytes']/(1024*1024*1024):.2f}GB, {pruned_label}: {filter_result['files_pruned_bytes']/(1024*1024*1024):.2f}GB)")
+        
+        # Spill details (simple display)
+        if spill_detected and spill_bytes > 0:
+            spill_mb = spill_bytes / 1024 / 1024
+            if spill_mb >= 1024:  # GB unit
+                spill_display = f"{spill_mb/1024:.2f} GB"
+            else:  # MB unit
+                spill_display = f"{spill_mb:.1f} MB"
+            report_lines.append(f"- 💿 {spill_details_label}: {spill_display}")
+        
+        # Shuffle attributes for shuffle nodes
+        if "shuffle" in raw_node_name.lower():
+            shuffle_attributes = extract_shuffle_attributes(node)
+            if shuffle_attributes:
+                report_lines.append(f"- 🔄 {shuffle_attributes_label}: {', '.join(shuffle_attributes)}")
+                
+                # REPARTITION suggestion (only when spill is detected)
+                if spill_detected and spill_bytes > 0:
+                    # Memory-based calculation (same logic as repartition_optimizer.py)
+                    memory_per_partition_threshold_mb = 512
+                    memory_per_partition_threshold_bytes = 512 * 1024 * 1024
+                    
+                    peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
+                    
+                    # Get current partition count
+                    current_partitions = num_tasks  # fallback value
+                    
+                    # Get more accurate partition count
+                    for metric_name in ["Sink - Number of partitions", "Number of partitions", "AQEShuffleRead - Number of partitions"]:
+                        if metric_name in detailed_metrics:
+                            current_partitions = detailed_metrics[metric_name].get('value', current_partitions)
+                            break
+                    
+                    # Memory-based accurate calculation
+                    if peak_memory_bytes > 0 and current_partitions > 0:
+                        memory_per_partition = peak_memory_bytes / current_partitions
+                        if memory_per_partition > memory_per_partition_threshold_bytes:
+                            suggested_partitions = int(round(peak_memory_bytes / memory_per_partition_threshold_bytes))
+                        else:
+                            suggested_partitions = current_partitions
+                    else:
+                        # Fallback: conventional logic
+                        suggested_partitions = max(num_tasks * 2, 100)
+                    
+                    # Use all detected shuffle attribute columns
+                    repartition_columns = ", ".join(shuffle_attributes)
+                    
+                    if output_language == 'ja':
+                        report_lines.append(f"- 💡 **{optimization_suggestion_label}**: REPARTITION({suggested_partitions}, {repartition_columns})")
+                        report_lines.append(f"  - **{reason_label}**: スピル({spill_mb:.1f} MB){reason_spill_improve}")
+                        report_lines.append(f"  - **{target_label}**: Shuffle属性全{len(shuffle_attributes)}{target_complete_use}")
+                    else:
+                        report_lines.append(f"- 💡 **{optimization_suggestion_label}**: REPARTITION({suggested_partitions}, {repartition_columns})")
+                        report_lines.append(f"  - **{reason_label}**: To improve spill ({spill_mb:.1f} MB)")
+                        report_lines.append(f"  - **{target_label}**: Complete use of all {len(shuffle_attributes)} {target_complete_use}")
+            else:
+                report_lines.append(f"- 🔄 {shuffle_attributes_label}: {not_configured}")
+        
+        # Clustering keys for scan nodes
+        if "scan" in raw_node_name.lower():
+            cluster_attributes = extract_cluster_attributes(node)
+            if cluster_attributes:
+                report_lines.append(f"- 📊 {clustering_keys_label}: {', '.join(cluster_attributes)}")
+            else:
+                report_lines.append(f"- 📊 {clustering_keys_label}: {not_configured}")
+        
+        # Skew details
+        if skew_detected and skewed_partitions > 0:
+            report_lines.append(f"- ⚖️ {skew_details_label}: {skewed_partitions} {skew_partitions_detected}")
+        
+        # Node ID
+        report_lines.append(f"- 🆔 {node_id_label}: {node.get('node_id', node.get('id', 'N/A'))}")
+        report_lines.append("")
+    
+    return report_lines
 
 # 🐌 Top 10 Most Time-Consuming Processes
 print(f"\n🐌 Top 10 Most Time-Consuming Processes")
@@ -11637,282 +11770,9 @@ The following topics are analyzed for process evaluation:
         
         # TOP10レポートの生成と統合（英語版 - 統一ロジック使用）
         try:
-            # 日本語版と同じ詳細ロジックを使用し、出力のみ英訳
-            
-            # === 同じ詳細分析ロジック（日本語版4651-4899行と同一） ===
-            # TOP10プロセス分析情報の取得
-            all_sorted_nodes = sorted(metrics['node_metrics'], 
-                                     key=lambda x: x['key_metrics'].get('durationMs', 0), 
-                                     reverse=True)
-            
-            # TOP5ボトルネック抽出用
-            sorted_nodes = all_sorted_nodes[:5]
-            
-            # 正しい全体時間の計算
-            overall_metrics_en = metrics.get('overall_metrics', {})
-            total_time_ms_en = overall_metrics_en.get('total_time_ms', 0)
-            
-            # 並列実行問題の修正: task_total_time_msを優先使用
-            task_total_time_ms_en = overall_metrics_en.get('task_total_time_ms', 0)
-            
-            if task_total_time_ms_en > 0:
-                total_time_ms_en = task_total_time_ms_en
-            elif total_time_ms_en <= 0:
-                execution_time_ms = overall_metrics_en.get('execution_time_ms', 0)
-                if execution_time_ms > 0:
-                    total_time_ms_en = execution_time_ms
-                else:
-                    max_node_time = max([node['key_metrics'].get('durationMs', 0) for node in all_sorted_nodes], default=1)
-                    total_time_ms_en = int(max_node_time * 1.2)
-            
-            # Generate detailed process information for each critical process (same logic as Japanese version)
-            for i, node in enumerate(sorted_nodes):
-                # Extract detailed information (same logic as cell 37)
-                rows_num = node['key_metrics'].get('rowsNum', 0)
-                duration_ms = node['key_metrics'].get('durationMs', 0)
-                memory_mb = node['key_metrics'].get('peakMemoryBytes', 0) / 1024 / 1024
-                
-                # Time percentage calculation
-                time_percentage = min((duration_ms / max(total_time_ms_en, 1)) * 100, 100.0)
-                
-                # Icons based on severity
-                if duration_ms >= 10000:  # 10+ seconds
-                    time_icon = "🔴"
-                    severity = "CRITICAL"
-                elif duration_ms >= 5000:  # 5+ seconds
-                    time_icon = "🟠"
-                    severity = "HIGH"
-                elif duration_ms >= 1000:  # 1+ seconds
-                    time_icon = "🟡"
-                    severity = "MEDIUM"
-                else:
-                    time_icon = "🟢"
-                    severity = "LOW"
-                
-                # Memory usage icon
-                memory_icon = "💚" if memory_mb < 100 else "⚠️" if memory_mb < 1000 else "🚨"
-                
-                # Get parallelism data
-                parallelism_data = extract_parallelism_metrics(node)
-                num_tasks = parallelism_data.get('tasks_total', 0)
-                
-                # Fallback for tasks
-                if num_tasks == 0:
-                    if parallelism_data.get('sink_tasks_total', 0) > 0:
-                        num_tasks = parallelism_data.get('sink_tasks_total', 0)
-                    elif parallelism_data.get('source_tasks_total', 0) > 0:
-                        num_tasks = parallelism_data.get('source_tasks_total', 0)
-                
-                # Parallelism icon
-                parallelism_icon = "🔥" if num_tasks >= 10 else "⚠️" if num_tasks >= 5 else "🐌"
-                
-                # Spill detection (same logic as cell 37)
-                spill_detected = False
-                spill_bytes = 0
-                exact_spill_metrics = [
-                    "Num bytes spilled to disk due to memory pressure",
-                    "Sink - Num bytes spilled to disk due to memory pressure",
-                    "Sink/Num bytes spilled to disk due to memory pressure"
-                ]
-                
-                # Search in detailed_metrics
-                detailed_metrics = node.get('detailed_metrics', {})
-                for metric_key, metric_info in detailed_metrics.items():
-                    metric_value = metric_info.get('value', 0)
-                    metric_label = metric_info.get('label', '')
-                    
-                    if (metric_key in exact_spill_metrics or metric_label in exact_spill_metrics) and metric_value > 0:
-                        spill_detected = True
-                        spill_bytes = max(spill_bytes, metric_value)
-                        break
-                
-                # Search in raw_metrics if not found
-                if not spill_detected:
-                    raw_metrics = node.get('metrics', [])
-                    for metric in raw_metrics:
-                        metric_key = metric.get('key', '')
-                        metric_label = metric.get('label', '')
-                        metric_value = metric.get('value', 0)
-                        
-                        if (metric_key in exact_spill_metrics or metric_label in exact_spill_metrics) and metric_value > 0:
-                            spill_detected = True
-                            spill_bytes = max(spill_bytes, metric_value)
-                            break
-                
-                # Spill icon
-                spill_icon = "💿" if spill_detected else "✅"
-                
-                # Skew detection (AQE-based)
-                skew_detected = False
-                skewed_partitions = 0
-                target_skew_metric = "AQEShuffleRead - Number of skewed partitions"
-                
-                # Search in detailed_metrics
-                for metric_key, metric_info in detailed_metrics.items():
-                    if metric_key == target_skew_metric:
-                        try:
-                            skewed_partitions = int(metric_info.get('value', 0))
-                            if skewed_partitions > 0:
-                                skew_detected = True
-                            break
-                        except (ValueError, TypeError):
-                            continue
-                
-                # Search in key_metrics if not found
-                if not skew_detected:
-                    key_metrics = node.get('key_metrics', {})
-                    if target_skew_metric in key_metrics:
-                        try:
-                            skewed_partitions = int(key_metrics[target_skew_metric])
-                            if skewed_partitions > 0:
-                                skew_detected = True
-                        except (ValueError, TypeError):
-                            pass
-                
-                # Skew icon
-                skew_icon = "⚖️" if skew_detected else "✅"
-                
-                # Get meaningful node name
-                raw_node_name = node['name']
-                node_name = get_meaningful_node_name(node, metrics)
-                short_name = node_name[:100] + "..." if len(node_name) > 100 else node_name
-                
-                # Generate detailed output (English version)
-                report += f"\n### {i+1}. {time_icon}{memory_icon}{parallelism_icon}{spill_icon}{skew_icon} [{severity:8}] {short_name}\n\n"
-                report += f"**Execution Time**: {duration_ms:,}ms ({time_percentage:.1f}% of total)\n"
-                report += f"**Severity**: {severity}\n\n"
-                report += "**📊 Detailed Metrics:**\n"
-                report += f"- ⏱️  Execution time: {duration_ms:>8,} ms ({duration_ms/1000:>6.1f} sec)\n"
-                report += f"- 📊 Rows processed: {rows_num:>8,} rows\n"
-                report += f"- 💾 Peak memory: {memory_mb:>6.1f} MB\n"
-                
-                # Display multiple Tasks total metrics
-                parallelism_display = []
-                for task_metric in parallelism_data.get('all_tasks_metrics', []):
-                    parallelism_display.append(f"{task_metric['name']}: {task_metric['value']}")
-                
-                if parallelism_display:
-                    report += f"- 🔧 Parallelism: {' | '.join(parallelism_display)}\n"
-                else:
-                    report += f"- 🔧 Parallelism: {num_tasks:>3d} tasks\n"
-                
-                # Skew status
-                aqe_shuffle_skew_warning = parallelism_data.get('aqe_shuffle_skew_warning', False)
-                
-                if skew_detected:
-                    skew_status = "Detected & handled by AQE"
-                elif aqe_shuffle_skew_warning:
-                    skew_status = "Potential skew possibility"
-                else:
-                    skew_status = "None"
-                
-                report += f"- 💿 Spill: {'Yes' if spill_detected else 'No'} | ⚖️ Skew: {skew_status}\n"
-                
-                # AQEShuffleRead metrics display
-                aqe_shuffle_metrics = parallelism_data.get('aqe_shuffle_metrics', [])
-                if aqe_shuffle_metrics:
-                    aqe_display = []
-                    for aqe_metric in aqe_shuffle_metrics:
-                        if aqe_metric['name'] == "AQEShuffleRead - Number of partitions":
-                            aqe_display.append(f"Partitions: {aqe_metric['value']}")
-                        elif aqe_metric['name'] == "AQEShuffleRead - Partition data size":
-                            aqe_display.append(f"Data size: {aqe_metric['value']:,} bytes")
-                    
-                    if aqe_display:
-                        report += f"- 🔄 AQEShuffleRead: {' | '.join(aqe_display)}\n"
-                        
-                        # Average partition size and warning display
-                        avg_partition_size = parallelism_data.get('aqe_shuffle_avg_partition_size', 0)
-                        if avg_partition_size > 0:
-                            avg_size_mb = avg_partition_size / (1024 * 1024)
-                            report += f"- 📊 Average partition size: {avg_size_mb:.2f} MB\n"
-                            
-                            # Warning when 512MB or more
-                            if parallelism_data.get('aqe_shuffle_skew_warning', False):
-                                report += f"- ⚠️  **WARNING** Average partition size exceeds 512MB - Potential skew possibility\n"
-                
-                # Processing efficiency calculation
-                if duration_ms > 0:
-                    rows_per_sec = (rows_num * 1000) / duration_ms
-                    report += f"- 🚀 Processing efficiency: {rows_per_sec:>8,.0f} rows/sec\n"
-                
-                # Filter rate display
-                filter_result = calculate_filter_rate(node)
-                filter_display = format_filter_rate_display(filter_result)
-                if filter_display:
-                    # Translate filter display to English
-                    filter_display_en = filter_display.replace("フィルタ率", "Filter rate").replace("読み込み", "read").replace("プルーン", "pruned")
-                    report += f"- {filter_display_en}\n"
-                else:
-                    if filter_result["has_filter_metrics"]:
-                        report += f"- 📂 Filter rate: {filter_result['filter_rate']:.1%} (read: {filter_result['files_read_bytes']/(1024*1024*1024):.2f}GB, pruned: {filter_result['files_pruned_bytes']/(1024*1024*1024):.2f}GB)\n"
-                
-                # Spill details (simple display)
-                if spill_detected and spill_bytes > 0:
-                    spill_mb = spill_bytes / 1024 / 1024
-                    if spill_mb >= 1024:  # GB unit
-                        spill_display = f"{spill_mb/1024:.2f} GB"
-                    else:  # MB unit
-                        spill_display = f"{spill_mb:.1f} MB"
-                    report += f"- 💿 Spill details: {spill_display}\n"
-                
-                # Shuffle attributes for shuffle nodes
-                if "shuffle" in raw_node_name.lower():
-                    shuffle_attributes = extract_shuffle_attributes(node)
-                    if shuffle_attributes:
-                        report += f"- 🔄 Shuffle attributes: {', '.join(shuffle_attributes)}\n"
-                        
-                        # REPARTITION suggestion (only when spill is detected)
-                        if spill_detected and spill_bytes > 0:
-                            # Memory-based calculation (same logic as repartition_optimizer.py)
-                            memory_per_partition_threshold_mb = 512
-                            memory_per_partition_threshold_bytes = 512 * 1024 * 1024
-                            
-                            peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
-                            
-                            # Get current partition count
-                            current_partitions = num_tasks  # fallback value
-                            
-                            # Get more accurate partition count
-                            for metric_name in ["Sink - Number of partitions", "Number of partitions", "AQEShuffleRead - Number of partitions"]:
-                                if metric_name in detailed_metrics:
-                                    current_partitions = detailed_metrics[metric_name].get('value', current_partitions)
-                                    break
-                            
-                            # Memory-based accurate calculation
-                            if peak_memory_bytes > 0 and current_partitions > 0:
-                                memory_per_partition = peak_memory_bytes / current_partitions
-                                if memory_per_partition > memory_per_partition_threshold_bytes:
-                                    suggested_partitions = int(round(peak_memory_bytes / memory_per_partition_threshold_bytes))
-                                else:
-                                    suggested_partitions = current_partitions
-                            else:
-                                # Fallback: conventional logic
-                                suggested_partitions = max(num_tasks * 2, 100)
-                            
-                            # Use all detected shuffle attribute columns
-                            repartition_columns = ", ".join(shuffle_attributes)
-                            
-                            report += f"- 💡 **Optimization suggestion**: REPARTITION({suggested_partitions}, {repartition_columns})\n"
-                            report += f"  - **Reason**: To improve spill ({spill_mb:.1f} MB)\n"
-                            report += f"  - **Target**: Complete use of all {len(shuffle_attributes)} shuffle attribute columns\n"
-                    else:
-                        report += f"- 🔄 Shuffle attributes: Not configured\n"
-                
-                # Clustering keys for scan nodes
-                if "scan" in raw_node_name.lower():
-                    cluster_attributes = extract_cluster_attributes(node)
-                    if cluster_attributes:
-                        report += f"- 📊 Clustering keys: {', '.join(cluster_attributes)}\n"
-                    else:
-                        report += f"- 📊 Clustering keys: Not configured\n"
-                
-                # Skew details
-                if skew_detected and skewed_partitions > 0:
-                    report += f"- ⚖️ Skew details: {skewed_partitions} skewed partitions (AQEShuffleRead detection)\n"
-                
-                # Node ID
-                report += f"- 🆔 Node ID: {node.get('node_id', node.get('id', 'N/A'))}\n\n"
+            # Use unified detailed analysis function (same logic as Japanese version)
+            detailed_lines = generate_detailed_top_processes_analysis(metrics, 10, 'en')
+            report += '\n'.join(detailed_lines)
             
         except Exception as e:
             report += f"⚠️ Error generating TOP10 analysis: {str(e)}\n"
