@@ -13073,7 +13073,6 @@ def refine_report_with_llm(raw_report: str, query_id: str) -> str:
 - # 📊 SQL最適化レポート
 - ## 🎯 1. パフォーマンス概要（主要指標、ボトルネック）
 - ## 🐌 2. 処理時間分析（詳細なボトルネック分析）
-- ## 🔧 3. Shuffle操作最適化分析（効率性評価、推奨事項）
 - ## 📋 4. テーブル最適化推奨
   ├── catalog_sales テーブル分析
   │   ├── 基本情報（テーブルサイズ・クラスタリングキー情報）
@@ -13085,7 +13084,7 @@ def refine_report_with_llm(raw_report: str, query_id: str) -> str:
       ├── 選定原則
       ├── GROUP BY キーの考慮条件
       └── 実務推奨
-- ## 🚀 4. SQL最適化分析結果（最適化プロセス詳細、最適化提案、パフォーマンス検証、期待効果）
+- ## 🚀 5. SQL最適化分析結果（最適化プロセス詳細、最適化提案、パフォーマンス検証、期待効果）
 - ## 🔍 6. EXPLAIN + EXPLAIN COST統合分析結果（必要時）
 
 【編集ルール】
@@ -19111,6 +19110,7 @@ def combine_reports_with_shuffle_analysis(main_report_content: str, shuffle_anal
     
     # テーブル最適化推奨セクションの位置を探す
     table_optimization_patterns = [
+        r'^## 📋 4\. テーブル最適化推奨',
         r'^## 📋 テーブル最適化推奨',
         r'^### 📋 テーブル最適化推奨', 
         r'^# 📋 テーブル最適化推奨',
@@ -19131,9 +19131,9 @@ def combine_reports_with_shuffle_analysis(main_report_content: str, shuffle_anal
         
         # Shuffle分析セクションのヘッダーを調整
         if OUTPUT_LANGUAGE == 'ja':
-            shuffle_section_header = "\n## 🔧 Enhanced Shuffle操作最適化分析\n\n"
+            shuffle_section_header = "\n## 🔧 3. Shuffle操作最適化分析\n\n"
         else:
-            shuffle_section_header = "\n## 🔧 Enhanced Shuffle Operations Optimization Analysis\n\n"
+            shuffle_section_header = "\n## 🔧 3. Shuffle Operations Optimization Analysis\n\n"
         
         # 元の装飾線を削除してシンプルに
         clean_shuffle_content = re.sub(r'^={70,}.*?={70,}\n', '', shuffle_analysis_content, flags=re.MULTILINE | re.DOTALL)
@@ -19153,9 +19153,9 @@ def combine_reports_with_shuffle_analysis(main_report_content: str, shuffle_anal
     else:
         # テーブル最適化推奨セクションが見つからない場合は末尾に追加
         if OUTPUT_LANGUAGE == 'ja':
-            shuffle_section_header = "\n\n## 🔧 Enhanced Shuffle操作最適化分析\n\n"
+            shuffle_section_header = "\n\n## 🔧 3. Shuffle操作最適化分析\n\n"
         else:
-            shuffle_section_header = "\n\n## 🔧 Enhanced Shuffle Operations Optimization Analysis\n\n"
+            shuffle_section_header = "\n\n## 🔧 3. Shuffle Operations Optimization Analysis\n\n"
             
         # 元の装飾線を削除してシンプルに
         clean_shuffle_content = re.sub(r'^={70,}.*?={70,}\n', '', shuffle_analysis_content, flags=re.MULTILINE | re.DOTALL)
