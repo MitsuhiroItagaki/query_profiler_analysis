@@ -9,7 +9,6 @@ A single-file tool to analyze Databricks SQL Profiler JSON logs with an LLM (Dat
 - **Profiler log ingestion**: Reads Databricks SQL Profiler JSON (parses `graphs` and key metrics)
 - **Metrics extraction**: Query basics, execution time, data volume, cache efficiency, stage/node details
 - **Bottleneck indicators**: Highlights skew, spill, shuffle, I/O hotspots, Photon utilization and more
-- **🔧 Enhanced Shuffle Optimization**: Memory efficiency validation (≤512MB per partition) with actionable recommendations
 - **Priority-based recommendations**: HIGH/MEDIUM/LOW optimization priorities with specific parameter suggestions
 - **Spark tuning guidance**: Automated Spark parameter recommendations for optimal performance
 - **Iterative optimization**: Up to 3 optimization attempts for progressive improvement
@@ -27,7 +26,8 @@ A single-file tool to analyze Databricks SQL Profiler JSON logs with an LLM (Dat
 
 ### Run on Databricks
 1. Import or create a notebook from `query_profiler_analysis.py`.
-2. Open the configuration cell near the top of the file and set key variables:
+2. Download metrics from Query Profiler (output as JSON file).
+3. Open the configuration cell near the top of the file and set key variables:
 
 ```python
 # File path in your workspace/DBFS
@@ -51,26 +51,6 @@ DEBUG_ENABLED = 'Y'
 
 # Max number of iterative optimization attempts
 MAX_OPTIMIZATION_ATTEMPTS = 3
-```
-
-3. 🔧 **Enhanced Shuffle Optimization Settings** (New Feature):
-
-```python
-SHUFFLE_ANALYSIS_CONFIG = {
-    # Memory per partition threshold (512MB)
-    "memory_per_partition_threshold_mb": 512,
-    "memory_per_partition_threshold_bytes": 512 * 1024 * 1024,
-    
-    # Performance thresholds
-    "high_memory_threshold_gb": 100,  # GB
-    "long_execution_threshold_sec": 300,  # 5 minutes
-    
-    # Optimization recommendations control
-    "enable_liquid_clustering_advice": True,
-    "enable_partition_tuning_advice": True,
-    "enable_cluster_sizing_advice": True,
-    "shuffle_analysis_enabled": True
-}
 ```
 
 4. Configure LLM provider (required):
@@ -118,20 +98,9 @@ LLM_CONFIG = {
 The tool writes files to the working directory. Typical names:
 - `output_original_query_*.sql` and `output_optimized_query_*.sql`
 - `output_optimization_report_en_*.md` or `output_optimization_report_jp_*.md`
-- 🔧 **Enhanced Shuffle Analysis Report** (New Feature): `output_enhanced_shuffle_analysis_en_*.md` or `output_enhanced_shuffle_analysis_jp_*.md`
 - Final refined report: `output_final_report_en_*.md` or `output_final_report_jp_*.md`
 
 Debug mode controls whether intermediate artifacts are retained.
-
-### 🔧 Enhanced Shuffle Optimization Report (New Feature)
-The new Shuffle optimization analysis provides:
-- **Memory efficiency validation**: Checks if memory per partition ≤ 512MB
-- **Optimization priority assessment**: HIGH/MEDIUM/LOW based on memory usage
-- **Actionable recommendations**: Specific partition counts and Spark parameters
-- **Performance improvement steps**: 4-stage implementation guidance (emergency/short/medium/long-term)
-- **Independent operation**: Works with both `EXPLAIN_ENABLED = 'Y'` and `EXPLAIN_ENABLED = 'N'`
-
-**Note**: Enhanced Shuffle Analysis uses profiler data directly from the JSON file and does not require EXPLAIN execution.
 
 ## Configuration summary
 - **JSON_FILE_PATH**: Path to the profiler JSON (DBFS, Workspace, or local)
@@ -142,9 +111,6 @@ The new Shuffle optimization analysis provides:
 - **DEBUG_ENABLED**: `'Y'` to keep intermediates, `'N'` to clean them up
 - **MAX_OPTIMIZATION_ATTEMPTS**: Iterative improvement attempts (default: 3)
 - **LLM_CONFIG**: Provider and parameters for LLM-based report refinement
-- **SHUFFLE_ANALYSIS_CONFIG**: 🔧 **Enhanced Shuffle optimization settings** (New Feature)
-  - `memory_per_partition_threshold_mb`: Memory efficiency threshold (default: 512MB)
-  - `shuffle_analysis_enabled`: Enable/disable enhanced Shuffle analysis
 
 Environment variables you can use instead of hardcoding keys:
 - `OPENAI_API_KEY`, `AZURE_OPENAI_API_KEY`, `ANTHROPIC_API_KEY`
@@ -156,11 +122,6 @@ Environment variables you can use instead of hardcoding keys:
 - **Token budget control**: Allocate up to 64K tokens for thinking process
 - **High-speed execution priority**: Disabled by default (enable when needed)
 
-### 🔧 Enhanced Shuffle Optimization
-- **Memory efficiency analysis**: Detailed analysis of memory usage per partition
-- **4-stage optimization strategy**: Progressive improvement plan (emergency/short/medium/long-term)
-- **Liquid Clustering recommendations**: Strategic proposals for fundamental shuffle reduction
-
 ### 🔄 Iterative Optimization
 - **Progressive improvement**: Up to 3 optimization attempts for performance enhancement
 - **Performance validation**: Effect measurement at each optimization step
@@ -169,7 +130,6 @@ Environment variables you can use instead of hardcoding keys:
 ## Troubleshooting
 - If no report files are generated, ensure the main analysis cells ran to completion and the input JSON path is correct.
 - Increase verbosity by setting `DEBUG_ENABLED='Y'` to keep intermediate artifacts for inspection.
-- If Enhanced Shuffle Analysis is not working, ensure `SHUFFLE_ANALYSIS_CONFIG["shuffle_analysis_enabled"]` is set to `True`.
 
 ## License
 Add your preferred license here if applicable.
