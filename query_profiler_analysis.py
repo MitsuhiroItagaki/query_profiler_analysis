@@ -12244,7 +12244,7 @@ def generate_comprehensive_optimization_report(query_id: str, optimized_result: 
         
         report += f"""
 
-## 🚀 4. SQL最適化分析結果
+## 🚀 5. SQL最適化分析結果
 
 {optimization_process_details}### 🎯 最適化実行方針
 
@@ -13073,7 +13073,7 @@ def refine_report_with_llm(raw_report: str, query_id: str) -> str:
 - # 📊 SQL最適化レポート
 - ## 🎯 1. パフォーマンス概要（主要指標、ボトルネック）
 - ## 🐌 2. 処理時間分析（詳細なボトルネック分析）
-- ## 📋 4. テーブル最適化推奨
+- ## 📋 3. テーブル最適化推奨
   ├── catalog_sales テーブル分析
   │   ├── 基本情報（テーブルサイズ・クラスタリングキー情報）
   │   ├── 推奨根拠
@@ -19105,35 +19105,35 @@ def find_latest_shuffle_analysis_file() -> str:
     return latest_file
 
 def combine_reports_with_shuffle_analysis(main_report_content: str, shuffle_analysis_content: str) -> str:
-    """Combine main report with enhanced shuffle analysis content before table optimization section"""
+    """Combine main report with enhanced shuffle analysis content before SQL optimization section"""
     import re
     
-    # テーブル最適化推奨セクションの位置を探す
-    table_optimization_patterns = [
-        r'^## 📋 4\. テーブル最適化推奨',
-        r'^## 📋 テーブル最適化推奨',
-        r'^### 📋 テーブル最適化推奨', 
-        r'^# 📋 テーブル最適化推奨',
-        r'## Table Optimization Recommendations',
-        r'### Table Optimization Recommendations',
-        r'# Table Optimization Recommendations'
+    # SQL最適化分析結果セクションの位置を探す
+    sql_optimization_patterns = [
+        r'^## 🚀 5\. SQL最適化分析結果',
+        r'^## 🚀 SQL最適化分析結果',
+        r'^### 🚀 SQL最適化分析結果',
+        r'^# 🚀 SQL最適化分析結果',
+        r'## SQL Optimization Analysis Results',
+        r'### SQL Optimization Analysis Results',
+        r'# SQL Optimization Analysis Results'
     ]
     
-    table_section_match = None
-    for pattern in table_optimization_patterns:
-        table_section_match = re.search(pattern, main_report_content, re.MULTILINE)
-        if table_section_match:
+    sql_section_match = None
+    for pattern in sql_optimization_patterns:
+        sql_section_match = re.search(pattern, main_report_content, re.MULTILINE)
+        if sql_section_match:
             break
     
-    if table_section_match:
-        # テーブル最適化推奨セクションの前に Shuffle分析を挿入
-        insert_position = table_section_match.start()
+    if sql_section_match:
+        # SQL最適化分析結果セクションの前に Shuffle分析を挿入
+        insert_position = sql_section_match.start()
         
         # Shuffle分析セクションのヘッダーを調整
         if OUTPUT_LANGUAGE == 'ja':
-            shuffle_section_header = "\n## 🔧 3. Shuffle操作最適化分析\n\n"
+            shuffle_section_header = "\n## 🔧 4. Shuffle操作最適化分析\n\n"
         else:
-            shuffle_section_header = "\n## 🔧 3. Shuffle Operations Optimization Analysis\n\n"
+            shuffle_section_header = "\n## 🔧 4. Shuffle Operations Optimization Analysis\n\n"
         
         # 元の装飾線を削除してシンプルに
         clean_shuffle_content = re.sub(r'^={70,}.*?={70,}\n', '', shuffle_analysis_content, flags=re.MULTILINE | re.DOTALL)
@@ -19151,11 +19151,11 @@ def combine_reports_with_shuffle_analysis(main_report_content: str, shuffle_anal
         
         return combined_content
     else:
-        # テーブル最適化推奨セクションが見つからない場合は末尾に追加
+        # SQL最適化分析結果セクションが見つからない場合は末尾に追加
         if OUTPUT_LANGUAGE == 'ja':
-            shuffle_section_header = "\n\n## 🔧 3. Shuffle操作最適化分析\n\n"
+            shuffle_section_header = "\n\n## 🔧 4. Shuffle操作最適化分析\n\n"
         else:
-            shuffle_section_header = "\n\n## 🔧 3. Shuffle Operations Optimization Analysis\n\n"
+            shuffle_section_header = "\n\n## 🔧 4. Shuffle Operations Optimization Analysis\n\n"
             
         # 元の装飾線を削除してシンプルに
         clean_shuffle_content = re.sub(r'^={70,}.*?={70,}\n', '', shuffle_analysis_content, flags=re.MULTILINE | re.DOTALL)
