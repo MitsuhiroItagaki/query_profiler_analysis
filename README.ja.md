@@ -27,7 +27,8 @@ Databricks SQL Profiler の JSON ログをLLM（Databricks Model Serving / OpenA
 
 ### Databricks 上で実行
 1. `query_profiler_analysis.py` からノートブックを作成またはインポートします。
-2. 冒頭の設定セルで主要変数を設定します:
+2. Query Profilerからメトリクスをダウンロードしてください（JSONファイルで出力されます）
+3. 冒頭の設定セルで主要変数を設定します:
 
 ```python
 # 入力 JSON（Workspace/DBFS 上のパス）
