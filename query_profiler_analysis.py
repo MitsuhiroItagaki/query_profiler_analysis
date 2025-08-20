@@ -2667,7 +2667,7 @@ def generate_enhanced_shuffle_optimization_report(shuffle_analysis: Dict[str, An
     if output_language == 'ja':
         report_lines = [
             "",
-            f"📊 基準: メモリ/パーティション ≤ {SHUFFLE_ANALYSIS_CONFIG['memory_per_partition_threshold_mb']}MB",
+            f"**基準**: メモリ/パーティション ≤ {SHUFFLE_ANALYSIS_CONFIG['memory_per_partition_threshold_mb']}MB",
             ""
         ]
         
@@ -2675,28 +2675,28 @@ def generate_enhanced_shuffle_optimization_report(shuffle_analysis: Dict[str, An
         
         # 全体サマリー
         report_lines.extend([
-            "📊 全体サマリー:",
-            f"  ・Shuffle操作数: {overall['total_shuffle_nodes']}",
-            f"  ・最適化が必要な操作: {overall['inefficient_nodes']}",
-            f"  ・総メモリ使用量: {overall['total_memory_gb']} GB",
-            f"  ・平均メモリ/パーティション: {overall['avg_memory_per_partition_mb']:.1f} MB",
-            f"  ・最適化必要性: {'はい' if overall['needs_optimization'] else 'いいえ'}",
+            "### 全体サマリー",
+            f"- Shuffle操作数: {overall['total_shuffle_nodes']}",
+            f"- 最適化が必要な操作: {overall['inefficient_nodes']}",
+            f"- 総メモリ使用量: {overall['total_memory_gb']} GB",
+            f"- 平均メモリ/パーティション: {overall['avg_memory_per_partition_mb']:.1f} MB",
+            f"- 最適化必要性: {'はい' if overall['needs_optimization'] else 'いいえ'}",
             ""
         ])
         
         # 効率性スコア
         if overall['total_shuffle_nodes'] > 0:
             efficiency_score = ((overall['total_shuffle_nodes'] - overall['inefficient_nodes']) / overall['total_shuffle_nodes']) * 100
-            efficiency_icon = "🟢" if efficiency_score >= 80 else "🟡" if efficiency_score >= 60 else "🔴"
+            efficiency_status = "良好" if efficiency_score >= 80 else "要改善" if efficiency_score >= 60 else "不良"
             report_lines.extend([
-                f"🎯 Shuffle効率性スコア: {efficiency_icon} {efficiency_score:.1f}%",
+                f"**Shuffle効率性スコア**: {efficiency_score:.1f}% ({efficiency_status})",
                 ""
             ])
         
         # 個別Shuffle分析
         if shuffle_analysis["shuffle_nodes"]:
             report_lines.extend([
-                "🔍 個別Shuffle操作分析:",
+                "### 個別Shuffle操作分析",
                 ""
             ])
             
@@ -2710,66 +2710,65 @@ def generate_enhanced_shuffle_optimization_report(shuffle_analysis: Dict[str, An
             )
             
             for i, node in enumerate(sorted_nodes, 1):
-                priority_icon = {"HIGH": "🚨", "MEDIUM": "⚠️", "LOW": "💡"}.get(node["optimization_priority"], "📊")
-                efficiency_status = "✅ 効率的" if node["is_memory_efficient"] else "❌ 非効率"
+                priority_status = {"HIGH": "高", "MEDIUM": "中", "LOW": "低"}.get(node["optimization_priority"], "不明")
+                efficiency_status = "効率的" if node["is_memory_efficient"] else "非効率"
                 
                 # メモリ/パーティションの警告レベル
                 memory_status = ""
                 if node["memory_per_partition_mb"] > SHUFFLE_ANALYSIS_CONFIG["memory_per_partition_threshold_mb"] * 4:
-                    memory_status = " 🔥 危険レベル"
+                    memory_status = " (危険レベル)"
                 elif node["memory_per_partition_mb"] > SHUFFLE_ANALYSIS_CONFIG["memory_per_partition_threshold_mb"] * 2:
-                    memory_status = " ⚠️ 高レベル"
+                    memory_status = " (高レベル)"
                 elif node["memory_per_partition_mb"] > SHUFFLE_ANALYSIS_CONFIG["memory_per_partition_threshold_mb"]:
-                    memory_status = " 📈 要注意"
+                    memory_status = " (要注意)"
                 
                 report_lines.extend([
-                    f"{i}. Shuffle (Node ID: {node['node_id']})",
-                    f"   {priority_icon} 優先度: {node['optimization_priority']}",
-                    f"   📊 パーティション数: {node['partition_count']:,}",
-                    f"   🧠 ピークメモリ: {node['peak_memory_gb']} GB",
-                    f"   ⚡ メモリ/パーティション: {node['memory_per_partition_mb']:.1f} MB{memory_status}",
-                    f"   ⏱️ 実行時間: {node['duration_sec']:.1f} 秒",
-                    f"   📈 処理行数: {node['rows_processed']:,}",
-                    f"   🎯 効率性: {efficiency_status}",
+                    f"#### {i}. Shuffle (Node ID: {node['node_id']})",
+                    f"- **優先度**: {priority_status}",
+                    f"- **パーティション数**: {node['partition_count']:,}",
+                    f"- **ピークメモリ**: {node['peak_memory_gb']} GB",
+                    f"- **メモリ/パーティション**: {node['memory_per_partition_mb']:.1f} MB{memory_status}",
+                    f"- **実行時間**: {node['duration_sec']:.1f} 秒",
+                    f"- **処理行数**: {node['rows_processed']:,}",
+                    f"- **効率性**: {efficiency_status}",
                     ""
                 ])
                 
                 if node["recommendations"]:
-                    report_lines.append("")
-                    report_lines.append("   💡 推奨事項:")
+                    report_lines.append("**推奨事項**:")
                     for rec in node["recommendations"]:
-                        report_lines.append(f"     - {rec}")
+                        report_lines.append(f"- {rec}")
                     report_lines.append("")
         
         # 全体最適化推奨事項
         if overall["optimization_summary"]:
             report_lines.extend([
-                "### 🎯 Shuffle最適化推奨事項",
+                "### Shuffle最適化推奨事項",
                 ""
             ])
             for summary in overall["optimization_summary"]:
-                report_lines.append(f"{summary}")
+                report_lines.append(f"- {summary}")
             report_lines.append("")
         
         # 具体的な実装手順
         if overall["needs_optimization"]:
             report_lines.extend([
-                "1️⃣ 緊急対策 (高優先度):",
-                "   - クラスターサイズの拡張 (ワーカーノード数増加)",
-                "   - 高メモリインスタンスタイプへの変更",
-                "   - spark.sql.adaptive.coalescePartitions.maxBatchSize の調整",
+                "#### 緊急対策 (高優先度)",
+                "- クラスターサイズの拡張 (ワーカーノード数増加)",
+                "- 高メモリインスタンスタイプへの変更",
+                "- spark.sql.adaptive.coalescePartitions.maxBatchSize の調整",
                 "",
-                "2️⃣ 短期対策:",
-                "   - spark.sql.adaptive.coalescePartitions.enabled = true",
-                "   - spark.sql.adaptive.skewJoin.enabled = true", 
-                "   - spark.sql.adaptive.advisoryPartitionSizeInBytes の調整",
-                f"   - 目標: {SHUFFLE_ANALYSIS_CONFIG['memory_per_partition_threshold_mb']}MB/パーティション以下",
+                "#### 短期対策",
+                "- spark.sql.adaptive.coalescePartitions.enabled = true",
+                "- spark.sql.adaptive.skewJoin.enabled = true", 
+                "- spark.sql.adaptive.advisoryPartitionSizeInBytes の調整",
+                f"- 目標: {SHUFFLE_ANALYSIS_CONFIG['memory_per_partition_threshold_mb']}MB/パーティション以下",
                 "",
-                "3️⃣ 中長期対策:",
-                "   - パーティション数の明示的指定 (.repartition())",
-                "   - JOIN戦略の最適化 (ブロードキャストJOINの活用)",
-                "   - Liquid Clusteringの実装",
-                "   - テーブル設計の最適化",
+                "#### 中長期対策",
+                "- パーティション数の明示的指定 (.repartition())",
+                "- JOIN戦略の最適化 (ブロードキャストJOINの活用)",
+                "- Liquid Clusteringの実装",
+                "- テーブル設計の最適化",
                 ""
             ])
             
@@ -2779,7 +2778,7 @@ def generate_enhanced_shuffle_optimization_report(shuffle_analysis: Dict[str, An
                 target_partition_size_bytes = target_partition_size_mb * 1024 * 1024
                 
                 report_lines.extend([
-                    "⚙️ 推奨Sparkパラメータ:",
+                    "#### 推奨Sparkパラメータ",
                     "",
                     "```",
                     f"spark.sql.adaptive.advisoryPartitionSizeInBytes = {target_partition_size_bytes}",
@@ -2793,7 +2792,7 @@ def generate_enhanced_shuffle_optimization_report(shuffle_analysis: Dict[str, An
     else:  # English
         report_lines = [
             "",
-            f"📊 Threshold: Memory per Partition ≤ {SHUFFLE_ANALYSIS_CONFIG['memory_per_partition_threshold_mb']}MB",
+            f"**Threshold**: Memory per Partition ≤ {SHUFFLE_ANALYSIS_CONFIG['memory_per_partition_threshold_mb']}MB",
             ""
         ]
         
@@ -2801,26 +2800,119 @@ def generate_enhanced_shuffle_optimization_report(shuffle_analysis: Dict[str, An
         
         # Overall Summary
         report_lines.extend([
-            "📊 Overall Summary:",
-            f"  • Number of Shuffle Operations: {overall['total_shuffle_nodes']}",
-            f"  • Operations Requiring Optimization: {overall['inefficient_nodes']}",
-            f"  • Total Memory Usage: {overall['total_memory_gb']} GB",
-            f"  • Average Memory per Partition: {overall['avg_memory_per_partition_mb']:.1f} MB",
-            f"  • Optimization Required: {'Yes' if overall['needs_optimization'] else 'No'}",
+            "### Overall Summary",
+            f"- Number of Shuffle Operations: {overall['total_shuffle_nodes']}",
+            f"- Operations Requiring Optimization: {overall['inefficient_nodes']}",
+            f"- Total Memory Usage: {overall['total_memory_gb']} GB",
+            f"- Average Memory per Partition: {overall['avg_memory_per_partition_mb']:.1f} MB",
+            f"- Optimization Required: {'Yes' if overall['needs_optimization'] else 'No'}",
             ""
         ])
         
         # Efficiency Score
         if overall['total_shuffle_nodes'] > 0:
             efficiency_score = ((overall['total_shuffle_nodes'] - overall['inefficient_nodes']) / overall['total_shuffle_nodes']) * 100
-            efficiency_icon = "🟢" if efficiency_score >= 80 else "🟡" if efficiency_score >= 60 else "🔴"
+            efficiency_status = "Good" if efficiency_score >= 80 else "Needs Improvement" if efficiency_score >= 60 else "Poor"
             report_lines.extend([
-                f"🎯 Shuffle Efficiency Score: {efficiency_icon} {efficiency_score:.1f}%",
+                f"**Shuffle Efficiency Score**: {efficiency_score:.1f}% ({efficiency_status})",
                 ""
             ])
         
-        # Individual Shuffle Analysis (略 - 英語版も同様に実装)
-        # ... 英語版の詳細レポート生成部分は省略 ...
+        # Individual Shuffle Analysis
+        if shuffle_analysis["shuffle_nodes"]:
+            report_lines.extend([
+                "### Individual Shuffle Operations Analysis",
+                ""
+            ])
+            
+            # Sort by priority
+            sorted_nodes = sorted(
+                shuffle_analysis["shuffle_nodes"], 
+                key=lambda x: (
+                    {"HIGH": 0, "MEDIUM": 1, "LOW": 2}[x["optimization_priority"]],
+                    -x["memory_per_partition_mb"]
+                )
+            )
+            
+            for i, node in enumerate(sorted_nodes, 1):
+                priority_status = {"HIGH": "High", "MEDIUM": "Medium", "LOW": "Low"}.get(node["optimization_priority"], "Unknown")
+                efficiency_status = "Efficient" if node["is_memory_efficient"] else "Inefficient"
+                
+                # Memory/partition warning level
+                memory_status = ""
+                if node["memory_per_partition_mb"] > SHUFFLE_ANALYSIS_CONFIG["memory_per_partition_threshold_mb"] * 4:
+                    memory_status = " (Critical Level)"
+                elif node["memory_per_partition_mb"] > SHUFFLE_ANALYSIS_CONFIG["memory_per_partition_threshold_mb"] * 2:
+                    memory_status = " (High Level)"
+                elif node["memory_per_partition_mb"] > SHUFFLE_ANALYSIS_CONFIG["memory_per_partition_threshold_mb"]:
+                    memory_status = " (Attention Required)"
+                
+                report_lines.extend([
+                    f"#### {i}. Shuffle (Node ID: {node['node_id']})",
+                    f"- **Priority**: {priority_status}",
+                    f"- **Partition Count**: {node['partition_count']:,}",
+                    f"- **Peak Memory**: {node['peak_memory_gb']} GB",
+                    f"- **Memory per Partition**: {node['memory_per_partition_mb']:.1f} MB{memory_status}",
+                    f"- **Execution Time**: {node['duration_sec']:.1f} seconds",
+                    f"- **Rows Processed**: {node['rows_processed']:,}",
+                    f"- **Efficiency**: {efficiency_status}",
+                    ""
+                ])
+                
+                if node["recommendations"]:
+                    report_lines.append("**Recommendations**:")
+                    for rec in node["recommendations"]:
+                        report_lines.append(f"- {rec}")
+                    report_lines.append("")
+        
+        # Overall optimization recommendations
+        if overall["optimization_summary"]:
+            report_lines.extend([
+                "### Shuffle Optimization Recommendations",
+                ""
+            ])
+            for summary in overall["optimization_summary"]:
+                report_lines.append(f"- {summary}")
+            report_lines.append("")
+        
+        # Specific implementation steps
+        if overall["needs_optimization"]:
+            report_lines.extend([
+                "#### Immediate Actions (High Priority)",
+                "- Expand cluster size (increase worker nodes)",
+                "- Switch to high-memory instance types",
+                "- Adjust spark.sql.adaptive.coalescePartitions.maxBatchSize",
+                "",
+                "#### Short-term Actions",
+                "- spark.sql.adaptive.coalescePartitions.enabled = true",
+                "- spark.sql.adaptive.skewJoin.enabled = true", 
+                "- Adjust spark.sql.adaptive.advisoryPartitionSizeInBytes",
+                f"- Target: {SHUFFLE_ANALYSIS_CONFIG['memory_per_partition_threshold_mb']}MB or less per partition",
+                "",
+                "#### Medium to Long-term Actions",
+                "- Explicitly specify partition count (.repartition())",
+                "- Optimize JOIN strategies (utilize broadcast JOIN)",
+                "- Implement Liquid Clustering",
+                "- Optimize table design",
+                ""
+            ])
+            
+            # Recommended Spark parameters
+            if overall["avg_memory_per_partition_mb"] > SHUFFLE_ANALYSIS_CONFIG["memory_per_partition_threshold_mb"]:
+                target_partition_size_mb = min(SHUFFLE_ANALYSIS_CONFIG["memory_per_partition_threshold_mb"], 256)
+                target_partition_size_bytes = target_partition_size_mb * 1024 * 1024
+                
+                report_lines.extend([
+                    "#### Recommended Spark Parameters",
+                    "",
+                    "```",
+                    f"spark.sql.adaptive.advisoryPartitionSizeInBytes = {target_partition_size_bytes}",
+                    "spark.sql.adaptive.coalescePartitions.minPartitionNum = 1",
+                    "spark.sql.adaptive.coalescePartitions.maxBatchSize = 100",
+                    f"spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes = {target_partition_size_bytes}",
+                    "```",
+                    ""
+                ])
     
     return "\n".join(report_lines)
 
@@ -19170,6 +19262,7 @@ def refine_report_content_with_llm(report_content: str) -> str:
 - **必須**: テーブル別詳細分析情報（現在キー、推奨キー、フィルタ率）を削除しない
 - **必須**: SQL実装例（ALTER TABLE、CLUSTER BY等）を完全な形で保持
 - **必須**: Enhanced Shuffle操作最適化分析セクションの内容を完全に保持し、構造と数値データを維持
+- **必須**: Enhanced Shuffle操作最適化分析は他の章と統一されたマークダウン形式を使用（過度な絵文字や特殊記号は削除し、標準的な見出しと箇条書きを使用）
 - **必須**: 処理時間分析とShuffle操作分析は統一されたリスト形式を使用し、装飾線や独自フォーマットは削除
 - **重複排除**: 同一テーブルの情報が複数セクションに記載されている場合は、より包括的で詳細な情報を持つセクションに統合し、重複部分を削除する
 """
@@ -19212,6 +19305,7 @@ def refine_report_content_with_llm(report_content: str) -> str:
 - **Required**: Do not delete detailed analysis information by table (current key, recommended key, filter rate)
 - **Required**: Preserve SQL implementation examples (ALTER TABLE, CLUSTER BY, etc.) in complete form
 - **Required**: Completely preserve Enhanced Shuffle Operations Optimization Analysis section content, maintaining structure and numerical data
+- **Required**: Enhanced Shuffle Operations Optimization Analysis should use unified markdown format consistent with other chapters (remove excessive emojis and special symbols, use standard headings and bullet points)
 - **Eliminate Duplicates**: When the same table information appears in multiple sections, consolidate into the more comprehensive and detailed section, removing duplicate portions
 """
     
