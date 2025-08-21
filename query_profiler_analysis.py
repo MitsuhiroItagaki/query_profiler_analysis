@@ -4002,7 +4002,7 @@ def analyze_liquid_clustering_opportunities(profiler_data: Dict[str, Any], metri
   - フィルタ率やアクセスパターンを考慮して判定
 
 ✅ 強く推奨: 50GB以上のテーブル
-  - 大規模テーブル（store_sales: 159GB, catalog_sales: 121GB等）
+  - 大規模テーブル（例: store_sales: 159GB, catalog_sales: 121GB等）
   - 理由: 大量のファイルでプルーニング効果が大きい
   
 【テーブル別推奨優先度】
@@ -5378,10 +5378,10 @@ def analyze_bottlenecks_with_llm(metrics: Dict[str, Any]) -> str:
     report_lines.append("## 📋 テーブル最適化推奨")
     report_lines.append("")
     
-    # テーブル分析がある場合のみ、catalog_salesテーブル分析として表示
+    # テーブル分析がある場合のみ、対象テーブル分析として表示
     if identified_tables:
-        # 最初のテーブル（通常catalog_sales）に対する分析
-        main_table = identified_tables[0] if identified_tables else "catalog_sales"
+        # 最初のテーブルに対する分析
+        main_table = identified_tables[0] if identified_tables else "unknown_table"
         report_lines.append(f"├── {main_table} テーブル分析")
         report_lines.append("│   ├── テーブルサイズ・クラスタリングキー情報")
         report_lines.append("│   ├── 選定根拠")
@@ -12963,31 +12963,30 @@ Please check:
                     # 既存のテーブル分析情報を使用
                     report += table_analysis_content
                 else:
-                    # フォールバック: 基本的なテーブル分析情報
-                    report += """### catalog_sales テーブル分析
+                    # フォールバック: 動的テーブル分析情報
+                    main_table_name = identified_tables[0] if identified_tables else "target_table"
+                    report += f"""### {main_table_name} テーブル分析
 
 #### 基本情報
-- **テーブルサイズ**: 1220.35GB
-- **現在のクラスタリングキー**: cs_item_sk, cs_sold_date_sk
-- **推奨クラスタリングカラム**: cs_bill_customer_sk, cs_item_sk, cs_sold_date_sk
+- **テーブル名**: {main_table_name}
+- **分析状況**: 詳細なテーブル情報を取得中...
+- **推奨**: 実際のテーブルメタデータを確認してください
 
 #### 推奨根拠
-- **テーブルサイズ**: 1220.35GBの大規模テーブルのため最適化が強く推奨
-- **cs_bill_customer_sk**: GROUP BY句で2回使用される主要な集約キー
-- **cs_item_sk**: 現在のキーに含まれており、データ局所性維持に重要
-- **cs_sold_date_sk**: 現在のキーに含まれており、日付フィルタリングに有効
-- 🚨 注意: Liquid Clusteringではキー順序変更はノードレベルのデータ局所性に影響しない
+- テーブル固有の分析が必要です
+- 実際のテーブルサイズとクラスタリング状況を確認してください
+- クエリパターンに基づく最適化を検討してください
 
-#### 実装SQL
+#### 実装方針
 ```sql
-ALTER TABLE tpcds.tpcds_sf10000_delta_lc.catalog_sales 
-CLUSTER BY (cs_bill_customer_sk, cs_item_sk, cs_sold_date_sk);
-OPTIMIZE tpcds.tpcds_sf10000_delta_lc.catalog_sales FULL;
+-- 実際のテーブル情報を確認してから実装してください
+-- DESCRIBE EXTENDED {main_table_name};
+-- SHOW TBLPROPERTIES {main_table_name};
 ```
 
-#### 期待効果
-- GROUP BY操作の効率化により実行時間が約30-40%短縮
-- 大量データ読み込み（14,399,880,363行）の効率化によるシャッフル操作とスピルの削減
+#### 注意事項
+- 実際のテーブル構造とデータ量に基づいて最適化を検討してください
+- 本番環境での実行前に十分なテストを行ってください
 
 """
                 
@@ -13001,31 +13000,30 @@ OPTIMIZE tpcds.tpcds_sf10000_delta_lc.catalog_sales FULL;
                     # Use existing table analysis content (translate if needed)
                     report += table_analysis_content
                 else:
-                    # Fallback: basic table analysis
-                    report += """### catalog_sales Table Analysis
+                    # Fallback: dynamic table analysis
+                    main_table_name = identified_tables[0] if identified_tables else "target_table"
+                    report += f"""### {main_table_name} Table Analysis
 
 #### Basic Information
-- **Table Size**: 1220.35GB
-- **Current Clustering Key**: cs_item_sk, cs_sold_date_sk
-- **Recommended Clustering Columns**: cs_bill_customer_sk, cs_item_sk, cs_sold_date_sk
+- **Table Name**: {main_table_name}
+- **Analysis Status**: Retrieving detailed table information...
+- **Recommendation**: Please verify actual table metadata
 
 #### Recommendation Rationale
-- **Table Size**: Large table of 1220.35GB strongly benefits from optimization
-- **cs_bill_customer_sk**: Primary aggregation key used twice in GROUP BY operations
-- **cs_item_sk**: Included in current key, important for maintaining data locality
-- **cs_sold_date_sk**: Included in current key, effective for date filtering
-- 🚨 Note: Key order changes in Liquid Clustering do not affect node-level data locality
+- Table-specific analysis is required
+- Please verify actual table size and clustering status
+- Consider optimization based on query patterns
 
-#### Implementation SQL
+#### Implementation Approach
 ```sql
-ALTER TABLE tpcds.tpcds_sf10000_delta_lc.catalog_sales 
-CLUSTER BY (cs_bill_customer_sk, cs_item_sk, cs_sold_date_sk);
-OPTIMIZE tpcds.tpcds_sf10000_delta_lc.catalog_sales FULL;
+-- Please verify actual table information before implementation
+-- DESCRIBE EXTENDED {main_table_name};
+-- SHOW TBLPROPERTIES {main_table_name};
 ```
 
-#### Expected Benefits
-- Approximately 30-40% execution time reduction through GROUP BY operation optimization
-- Reduced shuffle operations and spills through efficient large data reading (14,399,880,363 rows)
+#### Important Notes
+- Consider optimization based on actual table structure and data volume
+- Perform thorough testing before production execution
 
 """
                 
@@ -13074,7 +13072,7 @@ def refine_report_with_llm(raw_report: str, query_id: str) -> str:
 - ## 🎯 1. パフォーマンス概要（主要指標、ボトルネック）
 - ## 🐌 2. 処理時間分析（詳細なボトルネック分析）
 - ## 📋 3. テーブル最適化推奨
-  ├── catalog_sales テーブル分析
+  ├── 対象テーブル分析
   │   ├── 基本情報（テーブルサイズ・クラスタリングキー情報）
   │   ├── 推奨根拠
   │   ├── 実装SQL
@@ -13974,31 +13972,30 @@ def save_optimized_sql_files(original_query: str, optimized_result: str, metrics
                     # 既存のテーブル分析情報を使用
                     refined_report += table_analysis_content
                 else:
-                    # フォールバック: 基本的なテーブル分析情報
-                    refined_report += """### catalog_sales テーブル分析
+                    # フォールバック: 動的テーブル分析情報
+                    main_table_name = identified_tables[0] if identified_tables else "target_table"
+                    refined_report += f"""### {main_table_name} テーブル分析
 
 #### 基本情報
-- **テーブルサイズ**: 1220.35GB
-- **現在のクラスタリングキー**: cs_item_sk, cs_sold_date_sk
-- **推奨クラスタリングカラム**: cs_bill_customer_sk, cs_item_sk, cs_sold_date_sk
+- **テーブル名**: {main_table_name}
+- **分析状況**: 詳細なテーブル情報を取得中...
+- **推奨**: 実際のテーブルメタデータを確認してください
 
 #### 推奨根拠
-- **テーブルサイズ**: 1220.35GBの大規模テーブルのため最適化が強く推奨
-- **cs_bill_customer_sk**: GROUP BY句で2回使用される主要な集約キー
-- **cs_item_sk**: 現在のキーに含まれており、データ局所性維持に重要
-- **cs_sold_date_sk**: 現在のキーに含まれており、日付フィルタリングに有効
-- 🚨 注意: Liquid Clusteringではキー順序変更はノードレベルのデータ局所性に影響しない
+- テーブル固有の分析が必要です
+- 実際のテーブルサイズとクラスタリング状況を確認してください
+- クエリパターンに基づく最適化を検討してください
 
-#### 実装SQL
+#### 実装方針
 ```sql
-ALTER TABLE tpcds.tpcds_sf10000_delta_lc.catalog_sales 
-CLUSTER BY (cs_bill_customer_sk, cs_item_sk, cs_sold_date_sk);
-OPTIMIZE tpcds.tpcds_sf10000_delta_lc.catalog_sales FULL;
+-- 実際のテーブル情報を確認してから実装してください
+-- DESCRIBE EXTENDED {main_table_name};
+-- SHOW TBLPROPERTIES {main_table_name};
 ```
 
-#### 期待効果
-- GROUP BY操作の効率化により実行時間が約30-40%短縮
-- 大量データ読み込み（14,399,880,363行）の効率化によるシャッフル操作とスピルの削減
+#### 注意事項
+- 実際のテーブル構造とデータ量に基づいて最適化を検討してください
+- 本番環境での実行前に十分なテストを行ってください
 
 """
                 
@@ -14012,31 +14009,30 @@ OPTIMIZE tpcds.tpcds_sf10000_delta_lc.catalog_sales FULL;
                     # Use existing table analysis content (translate if needed)
                     refined_report += table_analysis_content
                 else:
-                    # Fallback: basic table analysis
-                    refined_report += """### catalog_sales Table Analysis
+                    # Fallback: dynamic table analysis
+                    main_table_name = identified_tables[0] if identified_tables else "target_table"
+                    refined_report += f"""### {main_table_name} Table Analysis
 
 #### Basic Information
-- **Table Size**: 1220.35GB
-- **Current Clustering Key**: cs_item_sk, cs_sold_date_sk
-- **Recommended Clustering Columns**: cs_bill_customer_sk, cs_item_sk, cs_sold_date_sk
+- **Table Name**: {main_table_name}
+- **Analysis Status**: Retrieving detailed table information...
+- **Recommendation**: Please verify actual table metadata
 
 #### Recommendation Rationale
-- **Table Size**: Large table of 1220.35GB strongly benefits from optimization
-- **cs_bill_customer_sk**: Primary aggregation key used twice in GROUP BY operations
-- **cs_item_sk**: Included in current key, important for maintaining data locality
-- **cs_sold_date_sk**: Included in current key, effective for date filtering
-- 🚨 Note: Key order changes in Liquid Clustering do not affect node-level data locality
+- Table-specific analysis is required
+- Please verify actual table size and clustering status
+- Consider optimization based on query patterns
 
-#### Implementation SQL
+#### Implementation Approach
 ```sql
-ALTER TABLE tpcds.tpcds_sf10000_delta_lc.catalog_sales 
-CLUSTER BY (cs_bill_customer_sk, cs_item_sk, cs_sold_date_sk);
-OPTIMIZE tpcds.tpcds_sf10000_delta_lc.catalog_sales FULL;
+-- Please verify actual table information before implementation
+-- DESCRIBE EXTENDED {main_table_name};
+-- SHOW TBLPROPERTIES {main_table_name};
 ```
 
-#### Expected Benefits
-- Approximately 30-40% execution time reduction through GROUP BY operation optimization
-- Reduced shuffle operations and spills through efficient large data reading (14,399,880,363 rows)
+#### Important Notes
+- Consider optimization based on actual table structure and data volume
+- Perform thorough testing before production execution
 
 """
                 
