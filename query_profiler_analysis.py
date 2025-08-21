@@ -13881,8 +13881,8 @@ def save_optimized_sql_files(original_query: str, optimized_result: str, metrics
             
             
             # 🎯 CATALOG/DATABASE設定の自動追加
-            catalog_name = globals().get("CATALOG", "tpcds")
-            database_name = globals().get("DATABASE", "tpcds_sf1000_delta_lc")
+            catalog_name = globals().get("CATALOG", CATALOG)
+            database_name = globals().get("DATABASE", DATABASE)
             
             f.write(f"-- 🗂️ カタログ・スキーマ設定（自動追加）\n")
             f.write(f"USE CATALOG {catalog_name};\n")
