@@ -13829,6 +13829,30 @@ def validate_final_sql_syntax(sql_query: str) -> bool:
     
     return True
 
+def get_catalog_database_config():
+    """
+    カタログ・データベース設定の取得を共通化
+    
+    Returns:
+        tuple: (catalog_name, database_name)
+    """
+    catalog_name = globals().get('CATALOG', CATALOG)
+    database_name = globals().get('DATABASE', DATABASE)
+    return catalog_name, database_name
+
+def add_catalog_database_settings(f, catalog_name, database_name):
+    """
+    カタログ・データベース設定を共通処理として関数化
+    
+    Args:
+        f: ファイルオブジェクト
+        catalog_name: カタログ名
+        database_name: データベース名
+    """
+    f.write(f"-- 🗂️ カタログ・スキーマ設定（自動追加）\n")
+    f.write(f"USE CATALOG {catalog_name};\n")
+    f.write(f"USE SCHEMA {database_name};\n\n")
+
 def save_optimized_sql_files(original_query: str, optimized_result: str, metrics: Dict[str, Any], analysis_result: str = "", llm_response: str = "", performance_comparison: Dict[str, Any] = None, best_attempt_number: int = None, optimization_attempts: list = None, optimization_success: bool = None) -> Dict[str, str]:
     """
     最適化されたSQLクエリを実行可能な形でファイルに保存
@@ -13881,12 +13905,8 @@ def save_optimized_sql_files(original_query: str, optimized_result: str, metrics
             
             
             # 🎯 CATALOG/DATABASE設定の自動追加
-            catalog_name = globals().get("CATALOG", CATALOG)
-            database_name = globals().get("DATABASE", DATABASE)
-            
-            f.write(f"-- 🗂️ カタログ・スキーマ設定（自動追加）\n")
-            f.write(f"USE CATALOG {catalog_name};\n")
-            f.write(f"USE SCHEMA {database_name};\n\n")
+            catalog_name, database_name = get_catalog_database_config()
+            add_catalog_database_settings(f, catalog_name, database_name)
                 
             if optimized_sql:
                 # SQLの末尾にセミコロンを確実に追加
@@ -14177,8 +14197,7 @@ original_query_filename = f"{OUTPUT_FILE_DIR}/output_original_query_{timestamp}.
 
 try:
     # カタログとデータベース設定の取得
-    catalog_name = globals().get('CATALOG', CATALOG)
-    database_name = globals().get('DATABASE', DATABASE)
+    catalog_name, database_name = get_catalog_database_config()
     
     with open(original_query_filename, 'w', encoding='utf-8') as f:
         f.write(f"-- 📋 オリジナルクエリ（プロファイラーデータから抽出）\n")
@@ -14187,9 +14206,7 @@ try:
         f.write(f"-- クエリ文字数: {len(original_query):,}\n\n")
         
         # カタログ・スキーマ設定の追加
-        f.write(f"-- 🗂️ カタログ・スキーマ設定（自動追加）\n")
-        f.write(f"USE CATALOG {catalog_name};\n")
-        f.write(f"USE SCHEMA {database_name};\n\n")
+        add_catalog_database_settings(f, catalog_name, database_name)
         
         # オリジナルクエリの書き込み
         f.write(f"-- 🔍 オリジナルクエリ\n")
