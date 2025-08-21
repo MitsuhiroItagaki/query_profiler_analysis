@@ -14177,8 +14177,8 @@ original_query_filename = f"{OUTPUT_FILE_DIR}/output_original_query_{timestamp}.
 
 try:
     # カタログとデータベース設定の取得
-    catalog_name = globals().get('CATALOG', 'tpcds')
-    database_name = globals().get('DATABASE', 'tpcds_sf1000_delta_lc')
+    catalog_name = globals().get('CATALOG', CATALOG)
+    database_name = globals().get('DATABASE', DATABASE)
     
     with open(original_query_filename, 'w', encoding='utf-8') as f:
         f.write(f"-- 📋 オリジナルクエリ（プロファイラーデータから抽出）\n")
