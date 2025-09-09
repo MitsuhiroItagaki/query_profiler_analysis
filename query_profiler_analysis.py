@@ -12737,6 +12737,7 @@ The following topics are analyzed for process evaluation:
                 # 📄 Add original query file name information
                 if latest_sql_filename:
                     selection_reason_en += f"\n- 📄 Reference file: {latest_sql_filename} (optimization trial result)"
+                adoption_sentence_en = ""  # Add missing assignment
             elif explain_enabled.upper() == 'N' and best_attempt_number >= 1:
                 final_selection_en = f"Optimized Query (attempt {best_attempt_number})"
                 selection_reason_en = "🔍 EXPLAIN disabled optimization query selection reason clarified: Adopting bottleneck analysis-based optimized query"
