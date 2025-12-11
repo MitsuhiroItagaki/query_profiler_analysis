@@ -73,8 +73,8 @@ OUTPUT_LANGUAGE = 'en'
 EXPLAIN_ENABLED = 'Y'
 
 # 🗂️ Catalog and database configuration (used when executing EXPLAIN statements)
-CATALOG = 'tpcds'
-DATABASE = 'tpcds_sf1000_delta_lc'
+CATALOG = 'sample'
+DATABASE = 'tpcds_sf1000'
 
 # 🐛 Debug mode setting (DEBUG_ENABLED: 'Y' = keep intermediate files, 'N' = keep final files only)
 DEBUG_ENABLED = 'N'
