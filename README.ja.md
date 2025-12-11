@@ -131,5 +131,26 @@ API キーは環境変数でも設定可能:
 - レポートが生成されない場合は、解析セルが最後まで実行されたか、入力 JSON パスが正しいか確認してください。
 - `DEBUG_ENABLED='Y'` で中間成果物を保持し可視性を上げられます。
 
+## 変更履歴
+
+### 2024-12-11: EXPLAIN要約ファイル管理の修正
+**問題**: `EXPLAIN_ENABLED='Y'` で実行してもレポートに "No EXPLAIN summary files were found" エラーが表示される
+
+**根本原因**:
+1. EXPLAIN結果のサイズが200KB未満の場合、要約ファイル（`.md`）が作成されない
+2. 要約ファイルの保存条件が `DEBUG_ENABLED='Y'` になっており、通常使用時（`DEBUG_ENABLED='N'`）にファイルが作成されない
+3. 最終レポート生成後も中間ファイル（`output_explain_summary_*.md`）が削除されずに残る
+
+**修正内容**:
+- **修正1**: サイズが閾値以下（200KB未満）でも、`EXPLAIN_ENABLED='Y'` の場合は要約ファイルを保存するように変更
+- **修正2**: 要約ファイルの保存条件を `DEBUG_ENABLED='Y'` から `EXPLAIN_ENABLED='Y'` に変更
+- **修正3**: `DEBUG_ENABLED='N'` の場合、最終レポート生成後に中間ファイル（`output_explain_summary_*.md`）を自動削除
+
+**影響範囲**:
+- `summarize_explain_results_with_llm` 関数（行10972-11257付近）
+- `finalize_report_files` 関数（行19463-19505付近）
+
+**結果**: 通常の使用パターン（`EXPLAIN_ENABLED='Y'`, `DEBUG_ENABLED='N'`）で、EXPLAIN要約が正常にレポートに統合され、不要な中間ファイルが自動削除されるようになりました。
+
 ## ライセンス
 必要に応じてライセンス文を追加してください。

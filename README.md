@@ -131,5 +131,26 @@ Environment variables you can use instead of hardcoding keys:
 - If no report files are generated, ensure the main analysis cells ran to completion and the input JSON path is correct.
 - Increase verbosity by setting `DEBUG_ENABLED='Y'` to keep intermediate artifacts for inspection.
 
+## Change Log
+
+### 2024-12-11: Fix for EXPLAIN Summary File Management
+**Issue**: "No EXPLAIN summary files were found" error appears in reports even when `EXPLAIN_ENABLED='Y'`
+
+**Root Causes**:
+1. EXPLAIN summary files (`.md`) were not created when EXPLAIN results were smaller than 200KB
+2. Summary file save condition was tied to `DEBUG_ENABLED='Y'`, preventing file creation in normal usage (`DEBUG_ENABLED='N'`)
+3. Intermediate files (`output_explain_summary_*.md`) remained after final report generation
+
+**Fixes**:
+- **Fix 1**: Modified to save summary files when `EXPLAIN_ENABLED='Y'`, regardless of size threshold
+- **Fix 2**: Changed summary file save condition from `DEBUG_ENABLED='Y'` to `EXPLAIN_ENABLED='Y'`
+- **Fix 3**: Added automatic cleanup of intermediate files (`output_explain_summary_*.md`) after final report generation when `DEBUG_ENABLED='N'`
+
+**Affected Areas**:
+- `summarize_explain_results_with_llm` function (around lines 10972-11257)
+- `finalize_report_files` function (around lines 19463-19505)
+
+**Result**: Normal usage pattern (`EXPLAIN_ENABLED='Y'`, `DEBUG_ENABLED='N'`) now correctly integrates EXPLAIN summaries into reports and automatically removes unnecessary intermediate files.
+
 ## License
 Add your preferred license here if applicable.

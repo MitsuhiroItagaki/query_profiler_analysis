@@ -10971,6 +10971,71 @@ def summarize_explain_results_with_llm(explain_content: str, explain_cost_conten
     
     if total_size < SUMMARIZATION_THRESHOLD:
         print(f"📊 EXPLAIN + EXPLAIN COST total size: {total_size:,} characters (no summary needed)")
+        
+        # 🔍 EXPLAIN_ENABLED='Y'の場合、要約なしでも結果をファイルに保存（レポート生成時に必要）
+        explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
+        if explain_enabled.upper() == 'Y' and not (query_type == "original" and optimization_success is True):
+            try:
+                from datetime import datetime
+                timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+                summary_filename = f"{OUTPUT_FILE_DIR}/output_explain_summary_{query_type}_{timestamp}.md"
+                
+                # 要約結果をMarkdown形式で保存（OUTPUT_LANGUAGEに応じて言語を切り替え）
+                output_language = globals().get('OUTPUT_LANGUAGE', 'ja')
+                
+                if output_language == 'en':
+                    summary_content = f"""# EXPLAIN + EXPLAIN COST Results ({query_type})
+
+## 📊 Basic Information
+- Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+- Query Type: {query_type}
+- Total Size: {total_size:,} characters (below threshold, no summarization performed)
+- EXPLAIN Size: {len(explain_content):,} characters
+- EXPLAIN COST Size: {len(explain_cost_content):,} characters
+
+## 🔍 EXPLAIN Results
+
+{explain_content}
+
+## 💰 EXPLAIN COST Results
+
+{explain_cost_content}
+
+## 📊 Statistical Information Extraction
+
+{extract_cost_statistics_from_explain_cost(explain_cost_content)}
+"""
+                else:
+                    summary_content = f"""# EXPLAIN + EXPLAIN COST結果 ({query_type})
+
+## 📊 基本情報
+- 生成日時: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+- クエリタイプ: {query_type}
+- 合計サイズ: {total_size:,}文字（閾値以下のため要約なし）
+- EXPLAINサイズ: {len(explain_content):,}文字
+- EXPLAIN COSTサイズ: {len(explain_cost_content):,}文字
+
+## 🔍 EXPLAIN結果
+
+{explain_content}
+
+## 💰 EXPLAIN COST結果
+
+{explain_cost_content}
+
+## 📊 統計情報抽出
+
+{extract_cost_statistics_from_explain_cost(explain_cost_content)}
+"""
+                
+                with open(summary_filename, 'w', encoding='utf-8') as f:
+                    f.write(summary_content)
+                
+                print(f"📄 Saving EXPLAIN results (no summarization): {summary_filename}")
+                
+            except Exception as save_error:
+                print(f"⚠️ Failed to save EXPLAIN results: {str(save_error)}")
+        
         return {
             'explain_summary': explain_content,
             'explain_cost_summary': explain_cost_content,
@@ -11112,10 +11177,10 @@ Please provide a concise summary in the following format (within 5000 characters
         # 要約結果を分割して返す
         print(f"✅ EXPLAIN + EXPLAIN COST summary completed: {len(summary_text):,} characters")
         
-        # 🚨 DEBUG_ENABLED='Y'の場合、要約結果をファイルに保存
-        debug_enabled = globals().get('DEBUG_ENABLED', 'N')
+        # 🔍 EXPLAIN_ENABLED='Y'の場合、要約結果をファイルに保存（レポート生成時に必要）
+        explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
         # 🚀 LLMコスト削減: オリジナルクエリは最適化成功時はファイル生成もスキップ
-        if debug_enabled.upper() == 'Y' and not (query_type == "original" and optimization_success is True):
+        if explain_enabled.upper() == 'Y' and not (query_type == "original" and optimization_success is True):
             try:
                 from datetime import datetime
                 timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -19398,9 +19463,11 @@ def save_refined_report(refined_content: str, original_filename: str) -> str:
 def finalize_report_files(original_filename: str, refined_filename: str) -> str:
     """Execute file processing based on DEBUG_ENABLED setting"""
     import os
+    import glob
     
     # DEBUG_ENABLED設定を確認
     debug_enabled = globals().get('DEBUG_ENABLED', 'N')
+    output_file_dir = globals().get('OUTPUT_FILE_DIR', './output')
     
     try:
         if debug_enabled.upper() == 'Y':
@@ -19418,6 +19485,17 @@ def finalize_report_files(original_filename: str, refined_filename: str) -> str:
             if os.path.exists(original_filename):
                 os.remove(original_filename)
                 print(f"🗑️ Deleted original file: {original_filename}")
+            
+            # 🗑️ 中間ファイル（EXPLAIN要約ファイル）も削除
+            explain_summary_files = glob.glob(f"{output_file_dir}/output_explain_summary_*.md")
+            if len(explain_summary_files) == 0:
+                print(f"ℹ️ No EXPLAIN summary files found to delete in {output_file_dir}")
+            for summary_file in explain_summary_files:
+                try:
+                    os.remove(summary_file)
+                    print(f"🗑️ Deleted intermediate EXPLAIN summary file: {summary_file}")
+                except Exception as delete_error:
+                    print(f"⚠️ Failed to delete {summary_file}: {str(delete_error)}")
         
         # 最終レポートファイル（output_final_report_*）はリネームせずそのまま保持
         if os.path.exists(refined_filename):
