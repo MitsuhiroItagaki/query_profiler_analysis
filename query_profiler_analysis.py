@@ -10062,24 +10062,24 @@ def generate_top10_time_consuming_processes_data(extracted_metrics: Dict[str, An
             # Shuffle attributes for shuffle nodes
             if "shuffle" in raw_node_name.lower():
                 shuffle_attributes = extract_shuffle_attributes(node)
-                    
+                if shuffle_attributes:
                     # REPARTITION suggestion (only when spill is detected)
                     if spill_detected and spill_bytes > 0:
                         # Memory-based calculation (same logic as repartition_optimizer.py)
                         memory_per_partition_threshold_mb = 512
                         memory_per_partition_threshold_bytes = 512 * 1024 * 1024
-                        
+
                         peak_memory_bytes = node.get('key_metrics', {}).get('peakMemoryBytes', 0)
-                        
+
                         # Get current partition count (from multiple sources)
                         current_partitions = num_tasks  # fallback value
-                        
+
                         # Get more accurate partition count
                         for metric_name in ["Sink - Number of partitions", "Number of partitions", "AQEShuffleRead - Number of partitions"]:
                             if metric_name in detailed_metrics:
                                 current_partitions = detailed_metrics[metric_name].get('value', current_partitions)
                                 break
-                        
+
                         # Memory-based accurate calculation (repartition_optimizer.py logic)
                         if peak_memory_bytes > 0 and current_partitions > 0:
                             memory_per_partition = peak_memory_bytes / current_partitions
@@ -10090,10 +10090,10 @@ def generate_top10_time_consuming_processes_data(extracted_metrics: Dict[str, An
                         else:
                             # Fallback: conventional logic
                             suggested_partitions = max(num_tasks * 2, 100)
-                        
+
                         # Use all detected shuffle attribute columns (exact match)
                         repartition_columns = ", ".join(shuffle_attributes)
-                        
+
                         optimization_suggestion = {
                             'type': 'repartition',
                             'suggested_partitions': suggested_partitions,
