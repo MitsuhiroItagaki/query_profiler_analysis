@@ -9,7 +9,7 @@ LLM（Databricks Model Serving、OpenAI、Azure OpenAI、Anthropic）を使用�
 - **ボトルネック検出**: スキュー、スピル、シャッフル、I/Oホットスポット、Photon効率
 - **優先度付き推奨**: HIGH/MEDIUM/LOWの最適化提案
 - **反復最適化**: 最大3回の段階的な最適化試行
-- **🧠 Thinking Mode**: Claude Opus 4.5の拡張思考モード対応
+- **EXPLAIN/EXPLAIN COST分析**: 実行プランに基づく最適化検証
 - **多言語出力**: 日本語/英語レポート生成
 - **マルチLLMプロバイダー**: Databricks、OpenAI、Azure OpenAI、Anthropic
 
@@ -34,7 +34,9 @@ pip install -e ".[dev]"
 
 ```
 query_profiler_analysis/
-├── src/                       # モジュール化されたソースコード (v2.0)
+├── notebooks/
+│   └── main_full.py           # Databricksノートブック（推奨）
+├── src/                       # モジュール化されたソースコード
 │   ├── config.py              # 設定管理
 │   ├── models.py              # データモデル
 │   ├── llm/                   # LLMクライアント
@@ -42,66 +44,33 @@ query_profiler_analysis/
 │   ├── optimization/          # クエリ最適化
 │   ├── report/                # レポート生成
 │   └── utils/                 # ユーティリティ
-├── notebooks/
-│   └── main.py                # Databricksノートブック (v2.0)
 ├── tests/                     # テストコード
-├── query_profiler_analysis.py # 旧版単一ファイル (v1.x)
+├── query_profiler_analysis.py # 完全版分析ロジック
 └── pyproject.toml
 ```
 
-## Quick Start
+## Quick Start（推奨）
 
-### 方法1: モジュール版 (v2.0 - 推奨)
+### Databricksノートブックでの実行
 
-```python
-from src.config import AnalysisConfig, LLMConfig, DatabricksLLMConfig, set_config
-from src.profiler import load_profiler_json, extract_metrics, analyze_bottlenecks
-from src.optimization import execute_iterative_optimization
-from src.report import generate_comprehensive_report
+1. **リポジトリをDatabricks Reposにクローン**
+   - Repos → Add Repo → `https://github.com/MitsuhiroItagaki/query_profiler_analysis.git`
 
-# 設定
-config = AnalysisConfig(
-    json_file_path='/Workspace/Shared/profiler.json',
-    output_file_dir='./output',
-    output_language='ja',
-    llm=LLMConfig(
-        provider='databricks',
-        databricks=DatabricksLLMConfig(
-            endpoint_name='databricks-claude-3-7-sonnet',
-        ),
-    ),
-)
-set_config(config)
+2. **`notebooks/main_full.py` を開く**
 
-# 分析実行
-data = load_profiler_json(config.json_file_path)
-metrics = extract_metrics(data)
-bottlenecks = analyze_bottlenecks(metrics)
-
-# 最適化
-result = execute_iterative_optimization(original_query, metrics)
-
-# レポート生成
-report = generate_comprehensive_report(metrics, bottlenecks, result)
-```
-
-### 方法2: 旧版単一ファイル (v1.x)
-
-1. `query_profiler_analysis.py` をDatabricksにインポート
-2. 設定セルで変数を設定:
+3. **設定セルを編集**:
 
 ```python
-JSON_FILE_PATH = '/Workspace/Shared/AutoSQLTuning/Query1.json'
+# 必須設定
+JSON_FILE_PATH = '/Volumes/your_catalog/your_schema/your_volume/query-profile.json'
 OUTPUT_FILE_DIR = './output'
 OUTPUT_LANGUAGE = 'ja'  # 'ja' or 'en'
-EXPLAIN_ENABLED = 'Y'
+EXPLAIN_ENABLED = 'Y'   # 'Y' = EXPLAIN実行, 'N' = スキップ
 CATALOG = 'your_catalog'
 DATABASE = 'your_database'
-```
+DEBUG_ENABLED = 'N'     # 'Y' = 中間ファイル保持, 'N' = 最終ファイルのみ
 
-3. LLMプロバイダーを設定:
-
-```python
+# LLM設定
 LLM_CONFIG = {
     "provider": "databricks",
     "databricks": {
@@ -112,52 +81,102 @@ LLM_CONFIG = {
 }
 ```
 
-4. 全セルを実行
+4. **Run All で全セルを実行**
+
+## Configuration Options
+
+| 設定 | 説明 | デフォルト |
+|------|------|-----------|
+| `JSON_FILE_PATH` | SQL ProfilerのJSONファイルパス | 必須 |
+| `OUTPUT_FILE_DIR` | 出力ディレクトリ | `./output` |
+| `OUTPUT_LANGUAGE` | 出力言語 (`ja`/`en`) | `en` |
+| `EXPLAIN_ENABLED` | EXPLAIN実行 (`Y`/`N`) | `Y` |
+| `CATALOG` | 使用するカタログ | 必須（EXPLAIN時） |
+| `DATABASE` | 使用するデータベース | 必須（EXPLAIN時） |
+| `DEBUG_ENABLED` | デバッグモード (`Y`/`N`) | `N` |
+| `MAX_OPTIMIZATION_ATTEMPTS` | 最適化試行回数 | `3` |
 
 ## LLM Provider Configuration
 
-### Databricks Model Serving
+### Databricks Model Serving（推奨）
 
 ```python
-LLMConfig(
-    provider='databricks',
-    databricks=DatabricksLLMConfig(
-        endpoint_name='databricks-claude-opus-4-5',
-        max_tokens=32000,
-        thinking_enabled=False,
-    ),
-)
+LLM_CONFIG = {
+    "provider": "databricks",
+    "databricks": {
+        "endpoint_name": "databricks-claude-opus-4-5",
+        "max_tokens": 32000,
+        "temperature": 0.0,
+        "thinking_enabled": False,
+    },
+}
 ```
 
 ### OpenAI
 
 ```python
-LLMConfig(
-    provider='openai',
-    openai=OpenAIConfig(
-        api_key='',  # or OPENAI_API_KEY env var
-        model='gpt-4o',
-    ),
-)
+LLM_CONFIG = {
+    "provider": "openai",
+    "openai": {
+        "api_key": "",  # または環境変数 OPENAI_API_KEY
+        "model": "gpt-4o",
+        "max_tokens": 16000,
+        "temperature": 0.0,
+    },
+}
 ```
 
 ### Anthropic
 
 ```python
-LLMConfig(
-    provider='anthropic',
-    anthropic=AnthropicConfig(
-        api_key='',  # or ANTHROPIC_API_KEY env var
-        model='claude-3-5-sonnet-20241022',
-    ),
-)
+LLM_CONFIG = {
+    "provider": "anthropic",
+    "anthropic": {
+        "api_key": "",  # または環境変数 ANTHROPIC_API_KEY
+        "model": "claude-3-5-sonnet-20241022",
+        "max_tokens": 16000,
+        "temperature": 0.0,
+    },
+}
 ```
 
-## Outputs
+## Output Files
 
-- `original_query_*.sql` - 元のクエリ
-- `optimized_query_*.sql` - 最適化クエリ
-- `optimization_report_*.md` - 最適化レポート
+### 最終成果物（DEBUG_ENABLED='N' 時）
+
+| ファイル | 説明 |
+|---------|------|
+| `output_original_query_*.sql` | 元のクエリ |
+| `output_optimized_query_*.sql` | 最適化されたクエリ |
+| `output_optimization_report_*.md` | 最適化レポート |
+| `output_final_report_*.md` | LLMリファイン済み最終レポート |
+
+### デバッグファイル（DEBUG_ENABLED='Y' 時のみ）
+
+- `output_explain_*.txt` - EXPLAIN結果
+- `output_explain_cost_*.txt` - EXPLAIN COST結果
+- `output_performance_judgment_log_*.txt` - パフォーマンス判定ログ
+- その他中間ファイル
+
+## Troubleshooting
+
+### EXPLAIN実行が失敗する場合
+
+1. `CATALOG` と `DATABASE` が正しく設定されているか確認
+2. クエリで使用するテーブルへのアクセス権限があるか確認
+3. テーブル名がフルパス（`catalog.schema.table`）で指定されているか確認
+
+```python
+# 手動でEXPLAINをテスト
+spark.sql("USE CATALOG your_catalog")
+spark.sql("USE DATABASE your_database")
+spark.sql("EXPLAIN SELECT * FROM your_table LIMIT 1").show(truncate=False)
+```
+
+### 最適化されたSQLにSELECT句がない場合
+
+LLMが不完全なSQLを生成した場合、自動的に元のクエリにフォールバックします。
+ログに「🚨 警告: 生成されたSQLにSELECT句がありません」と表示されます。
 
 ## Development
 
@@ -177,12 +196,18 @@ mypy src/
 
 ## Change Log
 
+### v2.1.0 - main_full.py 統合版
+- `notebooks/main_full.py` を推奨エントリポイントとして追加
+- `%run` で完全版分析ロジックを読み込み
+- `SKIP_AUTO_CLEANUP` フラグによる適切なクリーンアップタイミング制御
+- 不完全なSQL生成時のフォールバック機能追加
+- `DEBUG_ENABLED='N'` 時の中間ファイル自動削除
+
 ### v2.0.0 - モジュール化リファクタリング
 - 20,000行の単一ファイルを20+モジュールに分割
 - dataclassによる型安全な設定管理
 - Strategy PatternによるLLMクライアント抽象化
 - pytestによるユニットテスト追加
-- 旧版 `query_profiler_analysis.py` は互換性のため維持
 
 ### v1.x - 初期リリース
 - 単一ファイル実装
