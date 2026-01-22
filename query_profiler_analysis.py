@@ -9917,12 +9917,11 @@ def generate_top10_time_consuming_processes_data(extracted_metrics: Dict[str, An
                 max_node_time = max([node['key_metrics'].get('durationMs', 0) for node in sorted_nodes], default=1)
                 total_duration = int(max_node_time * 1.2)
                 print(f"⚠️ generate_top10 report: Final fallback - using estimated time: {total_duration} ms")
-        
-        report_lines.append(f"📊 累積タスク実行時間（並列）: {total_duration:,} ms ({total_duration/3600000:.1f} 時間)")
-        report_lines.append(f"📈 TOP{limit_nodes}合計時間（並列実行）: {sum(node['key_metrics'].get('durationMs', 0) for node in final_sorted_nodes):,} ms")
 
-        report_lines.append("")
-        
+        # Update summary with calculated values
+        analysis_data['summary']['total_duration'] = total_duration
+        analysis_data['summary']['total_top_nodes_duration'] = sum(node['key_metrics'].get('durationMs', 0) for node in final_sorted_nodes)
+
         for i, node in enumerate(final_sorted_nodes):
             # バグ修正：変数を正しく定義（セル37と統一）
             duration_ms = node['key_metrics'].get('durationMs', 0)
