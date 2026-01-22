@@ -41,6 +41,9 @@ DATABASE = 'base'
 DEBUG_ENABLED = 'N'
 MAX_OPTIMIZATION_ATTEMPTS = 3
 
+# Skip auto cleanup in query_profiler_analysis.py (cleanup is done at the end of this notebook)
+SKIP_AUTO_CLEANUP = True
+
 # LLM Configuration
 LLM_CONFIG = {
     "provider": "databricks",

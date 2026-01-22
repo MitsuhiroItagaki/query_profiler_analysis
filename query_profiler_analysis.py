@@ -19682,29 +19682,30 @@ except Exception as e:
     traceback.print_exc()
 # 
 print()
-# 
+#
 # # 🧹 中間ファイルの削除処理（DEBUG_ENABLEDフラグに基づく）
-debug_enabled = globals().get('DEBUG_ENABLED', 'N')
-explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
-
-if debug_enabled.upper() == 'Y':
+# Skip cleanup when called via %run from main_full.py (SKIP_AUTO_CLEANUP flag)
+if globals().get('SKIP_AUTO_CLEANUP', False):
+    print("⏭️ Skipping auto cleanup (SKIP_AUTO_CLEANUP=True, cleanup will be done by main_full.py)")
+elif globals().get('DEBUG_ENABLED', 'N').upper() == 'Y':
+    _explain_enabled_debug = globals().get('EXPLAIN_ENABLED', 'N')
     print("\n🐛 Debug mode enabled: Preserving intermediate files")
     print("-" * 40)
     print("💡 All intermediate files are preserved because DEBUG_ENABLED=Y")
     print("📁 The following files are preserved:")
-    
+
     import glob
     import os
-    
+
     # 保持されるファイル一覧を表示
-    if explain_enabled.upper() == 'Y':
+    if _explain_enabled_debug.upper() == 'Y':
         original_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_original_*.txt")
         optimized_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_optimized_*.txt")
         cost_original_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_cost_original_*.txt")
         cost_optimized_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_cost_optimized_*.txt")
         error_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_error_*.txt")
         all_files = original_files + optimized_files + cost_original_files + cost_optimized_files + error_files
-        
+
         if all_files:
             print(f"   🔍 EXPLAIN result files:")
             print(f"      📊 EXPLAIN: Original {len(original_files)} files, Post-optimization {len(optimized_files)} files")
@@ -19714,19 +19715,20 @@ if debug_enabled.upper() == 'Y':
                 print(f"      📄 {file_path}")
             if len(all_files) > 3:
                 print(f"      ... and {len(all_files) - 3} other files")
-    
+
     print("✅ Debug mode: Skipped file deletion processing")
 else:
+    _explain_enabled_cleanup = globals().get('EXPLAIN_ENABLED', 'N')
     print("\n🧹 Intermediate file deletion processing")
     print("-" * 40)
     print("💡 Deleting intermediate files because DEBUG_ENABLED=N")
     language_suffix = 'en' if OUTPUT_LANGUAGE == 'en' else 'jp'
     print(f"📁 Files to be kept: output_original_query_*.sql, output_optimization_report_{language_suffix}_*.md, output_optimized_query_*.sql")
-    
+
     import glob
     import os
-    
-    if explain_enabled.upper() == 'Y':
+
+    if _explain_enabled_cleanup.upper() == 'Y':
         # EXPLAIN結果ファイルとエラーファイルを検索（新パターン + 旧パターン）
         original_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_original_*.txt")
         optimized_files = glob.glob(f"{OUTPUT_FILE_DIR}/output_explain_optimized_*.txt")
