@@ -18,7 +18,21 @@
 # COMMAND ----------
 
 import sys
+import os
 sys.path.insert(0, '..')
+
+# Databricks環境からトークンとURLを取得して環境変数に設定
+try:
+    token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
+    os.environ["DATABRICKS_TOKEN"] = token
+
+    workspace_url = spark.conf.get("spark.databricks.workspaceUrl")
+    os.environ["DATABRICKS_WORKSPACE_URL"] = workspace_url
+
+    print(f"✅ Databricks credentials configured")
+    print(f"🔗 Workspace: {workspace_url}")
+except Exception as e:
+    print(f"⚠️ Could not auto-configure Databricks credentials: {e}")
 
 from src.config import AnalysisConfig, LLMConfig, DatabricksLLMConfig, set_config
 
