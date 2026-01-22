@@ -9626,6 +9626,7 @@ FROM (
 
 
 【重要な制約】
+- 🚨 **SELECT文は必須です**: 最適化されたSQLは必ず「SELECT」で始まる必要があります。FROMで始まるクエリは無効です。
 - 絶対に不完全なクエリを生成しないでください
 - すべてのカラム名、テーブル名、CTE名を完全に記述してください
 - プレースホルダー（...、[省略]、空白など）は一切使用しないでください
@@ -9635,6 +9636,7 @@ FROM (
 - 元のクエリが長い場合でも、すべてのカラムを省略せずに記述してください
 - 実際に実行できる完全なSQLクエリのみを出力してください
 - 元のクエリと同じアウトプットになることを厳守してください
+- **🚨 必ずSELECT句から始めてください**: WITH CTEで始まる場合もOKですが、FROMで始まるクエリは絶対に禁止です
 
 【🚨 最適化における構文エラー防止】
 **絶対に守るべき文法ルール（構文エラー防止のため必須）:**
@@ -17996,12 +17998,13 @@ def extract_sql_from_llm_response(llm_response: str) -> str:
     lines = llm_response.split('\n')
     sql_lines = []
     in_sql = False
-    
+
     for line in lines:
         line_stripped = line.strip()
-        
-        # SQL開始の検出（より厳密）
-        if re.match(r'^(WITH|SELECT|FROM|CREATE|INSERT|UPDATE|DELETE)\s', line_stripped, re.IGNORECASE):
+
+        # SQL開始の検出（より厳密 - FROMのみで始まるクエリは無効）
+        # 🚨 重要: FROMのみで始まるクエリはSELECT句がないため無効
+        if re.match(r'^(WITH|SELECT|CREATE|INSERT|UPDATE|DELETE)\s', line_stripped, re.IGNORECASE):
             in_sql = True
         
         if in_sql:
@@ -18031,14 +18034,14 @@ def clean_extracted_sql(sql_content: str) -> str:
     """
     if not sql_content:
         return ""
-    
+
     # 分析テキストの混入を除去
     lines = sql_content.split('\n')
     cleaned_lines = []
-    
+
     for line in lines:
         line_stripped = line.strip()
-        
+
         # 分析テキストの除去
         if (line_stripped.startswith('**') or
             line_stripped.startswith('##') or
@@ -18047,17 +18050,29 @@ def clean_extracted_sql(sql_content: str) -> str:
             '最適化手法' in line_stripped or
             'EXPLAIN COST' in line_stripped and 'ベース' in line_stripped):
             break
-        
+
         # 空行でない、または意味のある行のみ追加
         if line_stripped or (cleaned_lines and not cleaned_lines[-1].strip()):
             cleaned_lines.append(line)
-    
+
     cleaned_sql = '\n'.join(cleaned_lines).strip()
-    
+
     # 先頭に付いた EXPLAIN/EXPLAIN COST を除去して純粋なSELECT等に正規化
     cleaned_sql = re.sub(r'^\s*EXPLAIN\s+COST\s+', '', cleaned_sql, flags=re.IGNORECASE)
     cleaned_sql = re.sub(r'^\s*EXPLAIN\s+', '', cleaned_sql, flags=re.IGNORECASE)
-    
+
+    # 🚨 バリデーション: FROMで始まるクエリはSELECT句がないため無効
+    # USE CATALOG/USE SCHEMA/コメントを除いた最初のSQL文を確認
+    sql_for_validation = cleaned_sql
+    # USE文とコメントを除去してバリデーション
+    sql_for_validation = re.sub(r'^\s*USE\s+(CATALOG|SCHEMA|DATABASE)\s+\w+\s*;?\s*', '', sql_for_validation, flags=re.IGNORECASE | re.MULTILINE)
+    sql_for_validation = re.sub(r'^\s*--.*$', '', sql_for_validation, flags=re.MULTILINE)
+    sql_for_validation = sql_for_validation.strip()
+
+    if sql_for_validation and re.match(r'^FROM\s', sql_for_validation, re.IGNORECASE):
+        print("🚨 警告: 生成されたSQLにSELECT句がありません。元のクエリを使用します。")
+        return ""
+
     return cleaned_sql
 
 
