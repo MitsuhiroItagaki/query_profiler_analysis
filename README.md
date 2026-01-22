@@ -1,156 +1,193 @@
 # Databricks SQL Profiler Analysis Tool
 
-A single-file tool to analyze Databricks SQL Profiler JSON logs with an LLM (Databricks Model Serving, OpenAI, Azure OpenAI, or Anthropic), identify bottlenecks, and propose concrete optimization steps.
-
-- **Main script**: `query_profiler_analysis.py`
-- **Outputs**: optimization reports and SQL files (see Outputs below)
+LLM（Databricks Model Serving、OpenAI、Azure OpenAI、Anthropic）を使用してDatabricks SQL ProfilerのJSONログを分析し、ボトルネックを特定して最適化提案を行うツール。
 
 ## Features
-- **Profiler log ingestion**: Reads Databricks SQL Profiler JSON (parses `graphs` and key metrics)
-- **Metrics extraction**: Query basics, execution time, data volume, cache efficiency, stage/node details
-- **Bottleneck indicators**: Highlights skew, spill, shuffle, I/O hotspots, Photon utilization and more
-- **Priority-based recommendations**: HIGH/MEDIUM/LOW optimization priorities with specific parameter suggestions
-- **Spark tuning guidance**: Automated Spark parameter recommendations for optimal performance
-- **Iterative optimization**: Up to 3 optimization attempts for progressive improvement
-- **🧠 Thinking Mode**: Advanced reasoning mode support for Databricks Claude 3.7 Sonnet
-- **LLM-assisted analysis**: Optional refinement of the report with specific, actionable recommendations
-- **Language support**: Output in English or Japanese
-- **Safe debug mode**: Keep or clean up intermediate artifacts
-- **Liquid Clustering analysis**: Detailed analysis for Delta Lake optimization
+
+- **Profiler JSON解析**: SQL Profiler出力の`graphs`とメトリクスを解析
+- **メトリクス抽出**: 実行時間、データ量、キャッシュ効率、ノード詳細
+- **ボトルネック検出**: スキュー、スピル、シャッフル、I/Oホットスポット、Photon効率
+- **優先度付き推奨**: HIGH/MEDIUM/LOWの最適化提案
+- **反復最適化**: 最大3回の段階的な最適化試行
+- **🧠 Thinking Mode**: Claude Opus 4.5の拡張思考モード対応
+- **多言語出力**: 日本語/英語レポート生成
+- **マルチLLMプロバイダー**: Databricks、OpenAI、Azure OpenAI、Anthropic
 
 ## Requirements
-- Databricks Runtime (run as a notebook)
-- Optional: `requests` for some HTTP interactions
 
-## Quick start
+- Python 3.9以上
+- Databricks Runtime（ノートブック実行時）
+- `requests` ライブラリ
 
-### Run on Databricks
-1. Import or create a notebook from `query_profiler_analysis.py`.
-2. Download metrics from Query Profiler (output as JSON file).
-3. Open the configuration cell near the top of the file and set key variables:
+## Installation
 
-```python
-# File path in your workspace/DBFS
-JSON_FILE_PATH = '/Workspace/Shared/AutoSQLTuning/Query1.json'
+```bash
+# リポジトリをクローン
+git clone https://github.com/MitsuhiroItagaki/query_profiler_analysis.git
+cd query_profiler_analysis
 
-# Output directory
-OUTPUT_FILE_DIR = './output'
-
-# Catalog/Database for EXPLAIN (when enabled)
-CATALOG = 'tpcds'
-DATABASE = 'tpcds_sf1000_delta_lc'
-
-# Output language: 'ja' or 'en'
-OUTPUT_LANGUAGE = 'en'
-
-# Enable/disable EXPLAIN execution on Databricks
-EXPLAIN_ENABLED = 'Y'
-
-# Preserve intermediate files if 'Y'
-DEBUG_ENABLED = 'Y'
-
-# Max number of iterative optimization attempts
-MAX_OPTIMIZATION_ATTEMPTS = 3
+# 開発環境セットアップ
+pip install -e ".[dev]"
 ```
 
-4. Configure LLM provider (required):
+## Project Structure
+
+```
+query_profiler_analysis/
+├── src/                       # モジュール化されたソースコード (v2.0)
+│   ├── config.py              # 設定管理
+│   ├── models.py              # データモデル
+│   ├── llm/                   # LLMクライアント
+│   ├── profiler/              # プロファイラ分析
+│   ├── optimization/          # クエリ最適化
+│   ├── report/                # レポート生成
+│   └── utils/                 # ユーティリティ
+├── notebooks/
+│   └── main.py                # Databricksノートブック (v2.0)
+├── tests/                     # テストコード
+├── query_profiler_analysis.py # 旧版単一ファイル (v1.x)
+└── pyproject.toml
+```
+
+## Quick Start
+
+### 方法1: モジュール版 (v2.0 - 推奨)
+
+```python
+from src.config import AnalysisConfig, LLMConfig, DatabricksLLMConfig, set_config
+from src.profiler import load_profiler_json, extract_metrics, analyze_bottlenecks
+from src.optimization import execute_iterative_optimization
+from src.report import generate_comprehensive_report
+
+# 設定
+config = AnalysisConfig(
+    json_file_path='/Workspace/Shared/profiler.json',
+    output_file_dir='./output',
+    output_language='ja',
+    llm=LLMConfig(
+        provider='databricks',
+        databricks=DatabricksLLMConfig(
+            endpoint_name='databricks-claude-3-7-sonnet',
+        ),
+    ),
+)
+set_config(config)
+
+# 分析実行
+data = load_profiler_json(config.json_file_path)
+metrics = extract_metrics(data)
+bottlenecks = analyze_bottlenecks(metrics)
+
+# 最適化
+result = execute_iterative_optimization(original_query, metrics)
+
+# レポート生成
+report = generate_comprehensive_report(metrics, bottlenecks, result)
+```
+
+### 方法2: 旧版単一ファイル (v1.x)
+
+1. `query_profiler_analysis.py` をDatabricksにインポート
+2. 設定セルで変数を設定:
+
+```python
+JSON_FILE_PATH = '/Workspace/Shared/AutoSQLTuning/Query1.json'
+OUTPUT_FILE_DIR = './output'
+OUTPUT_LANGUAGE = 'ja'  # 'ja' or 'en'
+EXPLAIN_ENABLED = 'Y'
+CATALOG = 'your_catalog'
+DATABASE = 'your_database'
+```
+
+3. LLMプロバイダーを設定:
 
 ```python
 LLM_CONFIG = {
-    "provider": "databricks",  # 'databricks' | 'openai' | 'azure_openai' | 'anthropic'
+    "provider": "databricks",
     "databricks": {
-        "endpoint_name": "databricks-claude-3-7-sonnet",
-        "max_tokens": 131072,  # 128K tokens (Claude 3.7 Sonnet maximum limit)
-        "temperature": 0.0,
-        # 🧠 Extended thinking mode (New Feature)
-        # "thinking_enabled": False,  # Default disabled for high-speed execution priority
-        # "thinking_budget_tokens": 65536  # Thinking token budget 64K tokens
-    },
-    "openai": {
-        "api_key": "",           # or set OPENAI_API_KEY in env
-        "model": "gpt-4o",
-        "max_tokens": 16000,
-        "temperature": 0.0,
-    },
-    "azure_openai": {
-        "api_key": "",           # or set AZURE_OPENAI_API_KEY in env
-        "endpoint": "",
-        "deployment_name": "",
-        "api_version": "2024-02-01",
-        "max_tokens": 16000,
-        "temperature": 0.0,
-    },
-    "anthropic": {
-        "api_key": "",           # or set ANTHROPIC_API_KEY in env
-        "model": "claude-3-5-sonnet-20241022",
-        "max_tokens": 16000,
+        "endpoint_name": "databricks-claude-opus-4-5",
+        "max_tokens": 32000,
         "temperature": 0.0,
     },
 }
 ```
 
-5. Run all cells. The tool will analyze the profiler JSON, generate an optimization report, and optionally refine it via the configured LLM.
+4. 全セルを実行
 
-## Inputs
-- Databricks SQL Profiler JSON produced by SQL Warehouse/DBSQL, containing plan graphs and metrics (expects keys like `graphs`).
+## LLM Provider Configuration
+
+### Databricks Model Serving
+
+```python
+LLMConfig(
+    provider='databricks',
+    databricks=DatabricksLLMConfig(
+        endpoint_name='databricks-claude-opus-4-5',
+        max_tokens=32000,
+        thinking_enabled=False,
+    ),
+)
+```
+
+### OpenAI
+
+```python
+LLMConfig(
+    provider='openai',
+    openai=OpenAIConfig(
+        api_key='',  # or OPENAI_API_KEY env var
+        model='gpt-4o',
+    ),
+)
+```
+
+### Anthropic
+
+```python
+LLMConfig(
+    provider='anthropic',
+    anthropic=AnthropicConfig(
+        api_key='',  # or ANTHROPIC_API_KEY env var
+        model='claude-3-5-sonnet-20241022',
+    ),
+)
+```
 
 ## Outputs
-The tool writes files to the working directory. Typical names:
-- `output_original_query_*.sql` and `output_optimized_query_*.sql`
-- `output_optimization_report_en_*.md` or `output_optimization_report_jp_*.md`
-- Final refined report: `output_final_report_en_*.md` or `output_final_report_jp_*.md`
 
-Debug mode controls whether intermediate artifacts are retained.
+- `original_query_*.sql` - 元のクエリ
+- `optimized_query_*.sql` - 最適化クエリ
+- `optimization_report_*.md` - 最適化レポート
 
-## Configuration summary
-- **JSON_FILE_PATH**: Path to the profiler JSON (DBFS, Workspace, or local)
-- **OUTPUT_FILE_DIR**: Output file directory
-- **CATALOG / DATABASE**: Used for EXPLAIN when enabled
-- **OUTPUT_LANGUAGE**: `'en'` or `'ja'`
-- **EXPLAIN_ENABLED**: `'Y'` to run EXPLAIN on Databricks, `'N'` to skip
-- **DEBUG_ENABLED**: `'Y'` to keep intermediates, `'N'` to clean them up
-- **MAX_OPTIMIZATION_ATTEMPTS**: Iterative improvement attempts (default: 3)
-- **LLM_CONFIG**: Provider and parameters for LLM-based report refinement
+## Development
 
-Environment variables you can use instead of hardcoding keys:
-- `OPENAI_API_KEY`, `AZURE_OPENAI_API_KEY`, `ANTHROPIC_API_KEY`
+```bash
+# テスト実行
+pytest
 
-## New Features Details
+# 単一テスト
+pytest tests/test_profiler.py -v
 
-### 🧠 Thinking Mode (Claude 3.7 Sonnet Only)
-- **Advanced reasoning process**: Detailed analysis for complex optimization problems
-- **Token budget control**: Allocate up to 64K tokens for thinking process
-- **High-speed execution priority**: Disabled by default (enable when needed)
+# Lint
+ruff check src/ tests/
 
-### 🔄 Iterative Optimization
-- **Progressive improvement**: Up to 3 optimization attempts for performance enhancement
-- **Performance validation**: Effect measurement at each optimization step
-- **Automatic fallback**: Use original query when optimization fails
-
-## Troubleshooting
-- If no report files are generated, ensure the main analysis cells ran to completion and the input JSON path is correct.
-- Increase verbosity by setting `DEBUG_ENABLED='Y'` to keep intermediate artifacts for inspection.
+# 型チェック
+mypy src/
+```
 
 ## Change Log
 
-### 2024-12-11: Fix for EXPLAIN Summary File Management
-**Issue**: "No EXPLAIN summary files were found" error appears in reports even when `EXPLAIN_ENABLED='Y'`
+### v2.0.0 - モジュール化リファクタリング
+- 20,000行の単一ファイルを20+モジュールに分割
+- dataclassによる型安全な設定管理
+- Strategy PatternによるLLMクライアント抽象化
+- pytestによるユニットテスト追加
+- 旧版 `query_profiler_analysis.py` は互換性のため維持
 
-**Root Causes**:
-1. EXPLAIN summary files (`.md`) were not created when EXPLAIN results were smaller than 200KB
-2. Summary file save condition was tied to `DEBUG_ENABLED='Y'`, preventing file creation in normal usage (`DEBUG_ENABLED='N'`)
-3. Intermediate files (`output_explain_summary_*.md`) remained after final report generation
-
-**Fixes**:
-- **Fix 1**: Modified to save summary files when `EXPLAIN_ENABLED='Y'`, regardless of size threshold
-- **Fix 2**: Changed summary file save condition from `DEBUG_ENABLED='Y'` to `EXPLAIN_ENABLED='Y'`
-- **Fix 3**: Added automatic cleanup of intermediate files (`output_explain_summary_*.md`) after final report generation when `DEBUG_ENABLED='N'`
-
-**Affected Areas**:
-- `summarize_explain_results_with_llm` function (around lines 10972-11257)
-- `finalize_report_files` function (around lines 19463-19505)
-
-**Result**: Normal usage pattern (`EXPLAIN_ENABLED='Y'`, `DEBUG_ENABLED='N'`) now correctly integrates EXPLAIN summaries into reports and automatically removes unnecessary intermediate files.
+### v1.x - 初期リリース
+- 単一ファイル実装
+- 基本的なボトルネック分析と最適化
 
 ## License
-Add your preferred license here if applicable.
+
+MIT
