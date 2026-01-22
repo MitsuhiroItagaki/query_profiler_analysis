@@ -235,10 +235,71 @@ else:
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## 🧹 Cleanup Intermediate Files
+
+# COMMAND ----------
+
+# Cleanup intermediate files when DEBUG_ENABLED = 'N'
+import glob
+import os
+
+if DEBUG_ENABLED.upper() != 'Y':
+    print("🧹 Cleaning up intermediate files (DEBUG_ENABLED='N')")
+    print("-" * 50)
+
+    # Patterns of intermediate files to delete
+    cleanup_patterns = [
+        f"{OUTPUT_FILE_DIR}/output_explain_original_*.txt",
+        f"{OUTPUT_FILE_DIR}/output_explain_optimized_*.txt",
+        f"{OUTPUT_FILE_DIR}/output_explain_cost_original_*.txt",
+        f"{OUTPUT_FILE_DIR}/output_explain_cost_optimized_*.txt",
+        f"{OUTPUT_FILE_DIR}/output_explain_error_*.txt",
+        f"{OUTPUT_FILE_DIR}/output_explain_plan_*.txt",
+        f"{OUTPUT_FILE_DIR}/output_physical_plan_full_*.txt",
+        f"{OUTPUT_FILE_DIR}/output_physical_plan_structured_*.json",
+        f"{OUTPUT_FILE_DIR}/output_explain_cost_statistics_*.txt",
+        f"{OUTPUT_FILE_DIR}/output_explain_cost_statistics_*.json",
+        f"{OUTPUT_FILE_DIR}/output_explain_cost_structured_*.json",
+        f"{OUTPUT_FILE_DIR}/output_performance_judgment_log_*.txt",
+        f"{OUTPUT_FILE_DIR}/liquid_clustering_analysis_*.md",
+        f"{OUTPUT_FILE_DIR}/output_liquid_clustering_guidelines_*.md",
+        f"{OUTPUT_FILE_DIR}/output_enhanced_shuffle_analysis_*.md",
+        f"{OUTPUT_FILE_DIR}/rewrite_trial_*.txt",
+        f"{OUTPUT_FILE_DIR}/optimization_points_summary.txt",
+        f"{OUTPUT_FILE_DIR}/trial_logs.txt",
+    ]
+
+    deleted_count = 0
+    for pattern in cleanup_patterns:
+        files = glob.glob(pattern)
+        for file_path in files:
+            try:
+                os.remove(file_path)
+                print(f"✅ Deleted: {os.path.basename(file_path)}")
+                deleted_count += 1
+            except Exception as e:
+                print(f"❌ Failed to delete: {file_path} - {e}")
+
+    if deleted_count > 0:
+        print(f"\n🗑️ Total deleted: {deleted_count} files")
+    else:
+        print("📁 No intermediate files found to delete")
+
+    # Show remaining files
+    remaining_files = glob.glob(f"{OUTPUT_FILE_DIR}/*")
+    if remaining_files:
+        print(f"\n📁 Remaining files in output directory:")
+        for f in remaining_files:
+            print(f"   - {os.path.basename(f)}")
+else:
+    print("🐛 DEBUG_ENABLED='Y': Keeping all intermediate files")
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## 📋 Summary
 # MAGIC
 # MAGIC Analysis complete. Check the output directory for:
 # MAGIC - Original SQL file
 # MAGIC - Optimized SQL file (if optimization successful)
 # MAGIC - Comprehensive optimization report
-# MAGIC - Shuffle analysis report
