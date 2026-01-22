@@ -31,12 +31,13 @@ except Exception as e:
 # COMMAND ----------
 
 # Configuration - Edit these values
-JSON_FILE_PATH = '/Workspace/Shared/AutoSQLTuning/query-profile.json'
+# IMPORTANT: These variables are set BEFORE %run so they won't be overwritten
+JSON_FILE_PATH = '/Volumes/main/base/mitsuhiro_vol/query-profile_01f0e3fe-4e86-159c-9d1e-61cf7fe9585f.json'
 OUTPUT_FILE_DIR = './output'
 OUTPUT_LANGUAGE = 'en'  # 'ja' or 'en'
 EXPLAIN_ENABLED = 'Y'
-CATALOG = 'your_catalog'
-DATABASE = 'your_database'
+CATALOG = 'main'
+DATABASE = 'base'
 DEBUG_ENABLED = 'N'
 MAX_OPTIMIZATION_ATTEMPTS = 3
 

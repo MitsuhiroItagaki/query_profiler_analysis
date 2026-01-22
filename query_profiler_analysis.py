@@ -59,25 +59,33 @@
 # COMMAND ----------
 
 # 📁 Input/Output Configuration
+# Note: These variables can be overridden by setting them BEFORE running this file via %run
 
 # SQLProfiler JSON file (required)
-JSON_FILE_PATH = '/Workspace/Shared/AutoSQLTuning/query-profile_01f07bbf-bb55-18a3-aa29-0cc57144b438.json'
+if 'JSON_FILE_PATH' not in dir():
+    JSON_FILE_PATH = '/Workspace/Shared/AutoSQLTuning/query-profile.json'
 
 # Output file directory (required)
-OUTPUT_FILE_DIR = './output'
+if 'OUTPUT_FILE_DIR' not in dir():
+    OUTPUT_FILE_DIR = './output'
 
 # 🌐 Output language setting (OUTPUT_LANGUAGE: 'ja' = Japanese, 'en' = English)
-OUTPUT_LANGUAGE = 'en'
+if 'OUTPUT_LANGUAGE' not in dir():
+    OUTPUT_LANGUAGE = 'en'
 
 # 🔍 EXPLAIN statement execution setting (EXPLAIN_ENABLED: 'Y' = execute, 'N' = do not execute)
-EXPLAIN_ENABLED = 'Y'
+if 'EXPLAIN_ENABLED' not in dir():
+    EXPLAIN_ENABLED = 'Y'
 
 # 🗂️ Catalog and database configuration (used when executing EXPLAIN statements)
-CATALOG = 'sample'
-DATABASE = 'tpcds_sf1000'
+if 'CATALOG' not in dir():
+    CATALOG = 'sample'
+if 'DATABASE' not in dir():
+    DATABASE = 'tpcds_sf1000'
 
 # 🐛 Debug mode setting (DEBUG_ENABLED: 'Y' = keep intermediate files, 'N' = keep final files only)
-DEBUG_ENABLED = 'N'
+if 'DEBUG_ENABLED' not in dir():
+    DEBUG_ENABLED = 'N'
 
 # 🚀 Iterative optimization maximum attempt count settings (MAX_OPTIMIZATION_ATTEMPTS: default 3 times)
 # 🔄 New design: Each attempt is clearly evaluated
@@ -86,7 +94,8 @@ DEBUG_ENABLED = 'N'
 # - 3rd attempt+ (performance_improvement): Corrected query generation based on degradation cause analysis
 # - When maximum attempts reached: Use original query
 # Note: This is a separate parameter from syntax error correction (MAX_RETRIES)
-MAX_OPTIMIZATION_ATTEMPTS = 3
+if 'MAX_OPTIMIZATION_ATTEMPTS' not in dir():
+    MAX_OPTIMIZATION_ATTEMPTS = 3
 
 # Ensure output directory exists
 import os
@@ -109,45 +118,47 @@ else:
 # COMMAND ----------
 
 # 🤖 LLM Endpoint Configuration
-LLM_CONFIG = {
-    # Endpoint type: 'databricks', 'openai', 'azure_openai', 'anthropic'
-    "provider": "databricks",
-    
-    # Databricks Model Serving configuration (high-speed execution priority)
-    "databricks": {
-        "endpoint_name": "databricks-claude-3-7-sonnet",  # Model Serving endpoint name
-        "max_tokens": 131072,  # 128K tokens (Claude 3.7 Sonnet maximum limit)
-        "temperature": 0.0,    # For deterministic output (0.1→0.0)
-        # "thinking_enabled": False,  # Extended thinking mode (default: disabled - high-speed execution priority) - Claude 3 Sonnet only
-        # "thinking_budget_tokens": 65536  # Thinking token budget 64K tokens (used only when enabled) - Claude 3 Sonnet only
-    },
-    
-    # OpenAI configuration (optimized for complete SQL generation)
-    "openai": {
-        "api_key": "",  # OpenAI API key (can also use environment variable OPENAI_API_KEY)
-        "model": "gpt-4o",  # gpt-4o, gpt-4-turbo, gpt-3.5-turbo
-        "max_tokens": 16000,  # Maximum within OpenAI limits
-        "temperature": 0.0    # For deterministic output (0.1→0.0)
-    },
-    
-    # Azure OpenAI configuration (optimized for complete SQL generation)
-    "azure_openai": {
-        "api_key": "",  # Azure OpenAI API key (can also use environment variable AZURE_OPENAI_API_KEY)
-        "endpoint": "",  # https://your-resource.openai.azure.com/
-        "deployment_name": "",  # Deployment name
-        "api_version": "2024-02-01",
-        "max_tokens": 16000,  # Maximum within Azure OpenAI limits
-        "temperature": 0.0    # For deterministic output (0.1→0.0)
-    },
-    
-    # Anthropic configuration (optimized for complete SQL generation)
-    "anthropic": {
-        "api_key": "",  # Anthropic API key (can also use environment variable ANTHROPIC_API_KEY)
-        "model": "claude-3-5-sonnet-20241022",  # claude-3-5-sonnet-20241022, claude-3-opus-20240229
-        "max_tokens": 16000,  # Maximum within Anthropic limits
-        "temperature": 0.0    # For deterministic output (0.1→0.0)
+# Note: LLM_CONFIG can be overridden by setting it BEFORE running this file via %run
+if 'LLM_CONFIG' not in dir():
+    LLM_CONFIG = {
+        # Endpoint type: 'databricks', 'openai', 'azure_openai', 'anthropic'
+        "provider": "databricks",
+
+        # Databricks Model Serving configuration (high-speed execution priority)
+        "databricks": {
+            "endpoint_name": "databricks-claude-opus-4-5",  # Model Serving endpoint name
+            "max_tokens": 32000,  # Maximum tokens
+            "temperature": 0.0,    # For deterministic output
+            "thinking_enabled": False,  # Extended thinking mode
+            "thinking_budget_tokens": 10000  # Thinking token budget
+        },
+
+        # OpenAI configuration (optimized for complete SQL generation)
+        "openai": {
+            "api_key": "",  # OpenAI API key (can also use environment variable OPENAI_API_KEY)
+            "model": "gpt-4o",  # gpt-4o, gpt-4-turbo, gpt-3.5-turbo
+            "max_tokens": 16000,  # Maximum within OpenAI limits
+            "temperature": 0.0    # For deterministic output
+        },
+
+        # Azure OpenAI configuration (optimized for complete SQL generation)
+        "azure_openai": {
+            "api_key": "",  # Azure OpenAI API key (can also use environment variable AZURE_OPENAI_API_KEY)
+            "endpoint": "",  # https://your-resource.openai.azure.com/
+            "deployment_name": "",  # Deployment name
+            "api_version": "2024-02-01",
+            "max_tokens": 16000,  # Maximum within Azure OpenAI limits
+            "temperature": 0.0    # For deterministic output
+        },
+
+        # Anthropic configuration (optimized for complete SQL generation)
+        "anthropic": {
+            "api_key": "",  # Anthropic API key (can also use environment variable ANTHROPIC_API_KEY)
+            "model": "claude-3-5-sonnet-20241022",  # claude-3-5-sonnet-20241022, claude-3-opus-20240229
+            "max_tokens": 16000,  # Maximum within Anthropic limits
+            "temperature": 0.0    # For deterministic output
+        }
     }
-}
 
 print("🤖 LLM endpoint configuration completed")
 print(f"🤖 LLM Provider: {LLM_CONFIG['provider']}")
