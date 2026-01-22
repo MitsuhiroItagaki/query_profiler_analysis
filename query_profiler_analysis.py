@@ -12209,9 +12209,11 @@ def generate_comprehensive_optimization_report(query_id: str, optimized_result: 
             
             # 最終選択の表示を分かりやすくする
             explain_enabled = globals().get('EXPLAIN_ENABLED', 'N')
+            adoption_sentence = ""  # Initialize to avoid UnboundLocalError
             if best_attempt_number == 0:
                 final_selection = "元のクエリ（最適化により改善されなかったため）"
                 selection_reason = "最適化試行で有効な改善が得られなかったため、元のクエリを使用"
+                adoption_sentence = ""
                 # 📄 元のクエリファイル名情報を追加
                 if latest_sql_filename:
                     selection_reason += f"\n- 📄 参考ファイル: {latest_sql_filename}（最適化試行結果）"
