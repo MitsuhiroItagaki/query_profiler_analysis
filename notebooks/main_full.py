@@ -248,13 +248,17 @@ if DEBUG_ENABLED.upper() != 'Y':
     print("-" * 50)
 
     # Patterns of intermediate files to delete
+    # NOTE: Keep final outputs: output_original_query_*.sql, output_optimized_query_*.sql, output_optimization_report_*.md
     cleanup_patterns = [
         f"{OUTPUT_FILE_DIR}/output_explain_original_*.txt",
         f"{OUTPUT_FILE_DIR}/output_explain_optimized_*.txt",
+        f"{OUTPUT_FILE_DIR}/output_explain_optimized_attempt_*.txt",
         f"{OUTPUT_FILE_DIR}/output_explain_cost_original_*.txt",
         f"{OUTPUT_FILE_DIR}/output_explain_cost_optimized_*.txt",
+        f"{OUTPUT_FILE_DIR}/output_explain_cost_optimized_attempt_*.txt",
         f"{OUTPUT_FILE_DIR}/output_explain_error_*.txt",
         f"{OUTPUT_FILE_DIR}/output_explain_plan_*.txt",
+        f"{OUTPUT_FILE_DIR}/output_explain_summary_*.md",
         f"{OUTPUT_FILE_DIR}/output_physical_plan_full_*.txt",
         f"{OUTPUT_FILE_DIR}/output_physical_plan_structured_*.json",
         f"{OUTPUT_FILE_DIR}/output_explain_cost_statistics_*.txt",
