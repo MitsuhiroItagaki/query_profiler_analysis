@@ -10034,103 +10034,34 @@ def generate_top10_time_consuming_processes_data(extracted_metrics: Dict[str, An
             spill_icon = "💿" if spill_detected else "✅"
             # スキューアイコン
             skew_icon = "⚖️" if skew_detected else "✅"
-            
-            # Enhanced detailed format with comprehensive information
-            report_lines.append(f"### {i+1}. {time_icon}{memory_icon}{parallelism_icon}{spill_icon}{skew_icon} [{severity:8}] {short_name}")
-            report_lines.append("")
-            report_lines.append(f"**Execution Time**: {duration_ms:,}ms ({time_percentage:.1f}% of total)")
-            report_lines.append(f"**Severity**: {severity}")
-            report_lines.append("")
-            report_lines.append("**📊 Detailed Metrics:**")
-            report_lines.append(f"- ⏱️  Execution time: {duration_ms:>8,} ms ({duration_ms/1000:>6.1f} sec)")
-            report_lines.append(f"- 📊 Rows processed: {rows_num:>8,} rows")
-            report_lines.append(f"- 💾 Peak memory: {memory_mb:>6.1f} MB")
-            
-            # Display multiple Tasks total metrics
-            parallelism_display = []
-            for task_metric in parallelism_data.get('all_tasks_metrics', []):
-                parallelism_display.append(f"{task_metric['name']}: {task_metric['value']}")
-            
-            if parallelism_display:
-                report_lines.append(f"- 🔧 Parallelism: {' | '.join(parallelism_display)}")
-            else:
-                report_lines.append(f"- 🔧 Parallelism: {num_tasks:>3d} tasks")
-            
+
             # Skew status (considering both AQE skew detection and AQEShuffleRead average partition size)
             aqe_shuffle_skew_warning = parallelism_data.get('aqe_shuffle_skew_warning', False)
-            
+
             if skew_detected:
                 skew_status = "Detected & handled by AQE"
             elif aqe_shuffle_skew_warning:
                 skew_status = "Potential skew possibility"
             else:
                 skew_status = "None"
-            
-            report_lines.append(f"- 💿 Spill: {'Yes' if spill_detected else 'No'} | ⚖️ Skew: {skew_status}")
-            
-            # AQEShuffleRead metrics display
+
+            # AQEShuffleRead metrics
             aqe_shuffle_metrics = parallelism_data.get('aqe_shuffle_metrics', [])
-            if aqe_shuffle_metrics:
-                aqe_display = []
-                for aqe_metric in aqe_shuffle_metrics:
-                    if aqe_metric['name'] == "AQEShuffleRead - Number of partitions":
-                        aqe_display.append(f"Partitions: {aqe_metric['value']}")
-                    elif aqe_metric['name'] == "AQEShuffleRead - Partition data size":
-                        aqe_display.append(f"Data size: {aqe_metric['value']:,} bytes")
-                
-                if aqe_display:
-                    report_lines.append(f"- 🔄 AQEShuffleRead: {' | '.join(aqe_display)}")
-                    
-                    # Average partition size and warning display
-                    avg_partition_size = parallelism_data.get('aqe_shuffle_avg_partition_size', 0)
-                    if avg_partition_size > 0:
-                        avg_size_mb = avg_partition_size / (1024 * 1024)
-                        report_lines.append(f"- 📊 Average partition size: {avg_size_mb:.2f} MB")
-                        
-                        # Warning when 512MB or more
-                        if parallelism_data.get('aqe_shuffle_skew_warning', False):
-                            report_lines.append(f"- ⚠️  **WARNING** Average partition size exceeds 512MB - Potential skew possibility")
-            
-            # Processing efficiency calculation (rows/sec)
-            if duration_ms > 0:
-                rows_per_sec = (rows_num * 1000) / duration_ms
-                report_lines.append(f"- 🚀 Processing efficiency: {rows_per_sec:>8,.0f} rows/sec")
-            
-            
-            # Filter rate display (with debug functionality)
+
+            # Filter analysis
             filter_result = calculate_filter_rate(node)
-            filter_display = format_filter_rate_display(filter_result)
-            if filter_display:
-                report_lines.append(f"- {filter_display}")
-            else:
-                # Debug info: why filter rate is not displayed
-                if filter_result["has_filter_metrics"]:
-                    report_lines.append(f"- 📂 Filter rate: {filter_result['filter_rate']:.1%} (read: {filter_result['files_read_bytes']/(1024*1024*1024):.2f}GB, pruned: {filter_result['files_pruned_bytes']/(1024*1024*1024):.2f}GB)")
-                else:
-                    # Metrics search debug
-                    debug_info = []
-                    for metric_key, metric_info in detailed_metrics.items():
-                        metric_label = metric_info.get('label', '')
-                        if 'file' in metric_label.lower() and ('read' in metric_label.lower() or 'prun' in metric_label.lower()):
-                            debug_info.append(f"{metric_label}: {metric_info.get('value', 0)}")
-                    
-                    if debug_info:
-                        report_lines.append(f"- 📂 Filter-related metrics detected: {', '.join(debug_info[:2])}")
-            
-            # Spill details (simple display)
-            if spill_detected and spill_bytes > 0:
-                spill_mb = spill_bytes / 1024 / 1024
-                if spill_mb >= 1024:  # GB unit
-                    spill_display = f"{spill_mb/1024:.2f} GB"
-                else:  # MB unit
-                    spill_display = f"{spill_mb:.1f} MB"
-                report_lines.append(f"- 💿 Spill details: {spill_display}")
-            
-            # Always display Shuffle attributes for shuffle nodes
+
+            # Spill details
+            spill_mb = spill_bytes / 1024 / 1024 if spill_bytes > 0 else 0
+
+            # Parallelism display
+            parallelism_display = []
+            for task_metric in parallelism_data.get('all_tasks_metrics', []):
+                parallelism_display.append(f"{task_metric['name']}: {task_metric['value']}")
+
+            # Shuffle attributes for shuffle nodes
             if "shuffle" in raw_node_name.lower():
                 shuffle_attributes = extract_shuffle_attributes(node)
-                if shuffle_attributes:
-                    report_lines.append(f"- 🔄 Shuffle attributes: {', '.join(shuffle_attributes)}")
                     
                     # REPARTITION suggestion (only when spill is detected)
                     if spill_detected and spill_bytes > 0:
